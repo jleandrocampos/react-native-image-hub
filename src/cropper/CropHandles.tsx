@@ -24,7 +24,7 @@ interface HandleProps {
   onDrag: (dx: number, dy: number) => void;
 }
 
-function Handle({ position, borderColor, onDrag }: HandleProps) {
+function Handle({ position, onDrag }: HandleProps) {
   const lastX = useSharedValue(0);
   const lastY = useSharedValue(0);
 
@@ -43,8 +43,7 @@ function Handle({ position, borderColor, onDrag }: HandleProps) {
       runOnJS(onDrag)(dx, dy);
     });
 
-  const handleSize = 32;
-  const dotSize = 12;
+  const handleSize = 40;
 
   const positionStyle = (() => {
     switch (position) {
@@ -61,14 +60,7 @@ function Handle({ position, borderColor, onDrag }: HandleProps) {
 
   return (
     <GestureDetector gesture={gesture}>
-      <View style={[styles.handle, positionStyle, { borderColor }]}>
-        <View
-          style={[
-            styles.handleDot,
-            { backgroundColor: borderColor, width: dotSize, height: dotSize },
-          ]}
-        />
-      </View>
+      <View style={[styles.handle, positionStyle]} />
     </GestureDetector>
   );
 }
@@ -151,15 +143,7 @@ const styles = StyleSheet.create({
   },
   handle: {
     position: 'absolute',
-    width: 32,
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 20,
-  },
-  handleDot: {
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: 'white',
+    width: 40,
+    height: 40,
   },
 });

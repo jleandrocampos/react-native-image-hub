@@ -40,6 +40,7 @@ export type {
   CameraOverlayItem,
   PickerOptions,
   CropperOptions,
+  CropperStyles,
   ImageResult,
   ImageHubError,
   GalleryAsset,

@@ -72,6 +72,49 @@ export interface PickerOptions extends BaseOptions {
 export interface CropperOptions extends BaseOptions {
   /** URI of the image to crop */
   path: string;
+  /** Custom styles for the cropper UI */
+  styles?: CropperStyles;
+}
+
+/**
+ * Custom styles for the cropper screen.
+ * All properties are optional — missing values use defaults.
+ */
+export interface CropperStyles {
+  /** Main container background color (default: 'black') */
+  backgroundColor?: string;
+  /** Toolbar background color (default: 'white') */
+  toolbarBackground?: string;
+  /** Toolbar title color (default: '#333') */
+  toolbarTitleColor?: string;
+  /** Toolbar title font size (default: 17) */
+  toolbarTitleSize?: number;
+  /** Toolbar border bottom color (default: '#ccc') */
+  toolbarBorderColor?: string;
+  /** Confirm button text color (default: tint color) */
+  confirmColor?: string;
+  /** Cancel button text color (default: widget color) */
+  cancelColor?: string;
+  /** Confirm button font size (default: 16) */
+  confirmSize?: number;
+  /** Cancel button font size (default: 16) */
+  cancelSize?: number;
+  /** Crop overlay color outside the crop area (default: 'rgba(0,0,0,0.5)') */
+  overlayColor?: string;
+  /** Crop area border color (default: '#5f8dd3') */
+  borderColor?: string;
+  /** Crop area border width (default: 2) */
+  borderWidth?: number;
+  /** Grid lines color inside crop area (default: 'rgba(255,255,255,0.3)') */
+  gridColor?: string;
+  /** Corner handle border color (default: border color) */
+  handleColor?: string;
+  /** Processing overlay background (default: 'rgba(0,0,0,0.5)') */
+  processingBackground?: string;
+  /** Processing card background (default: 'white') */
+  processingCardBackground?: string;
+  /** Processing text color (default: '#333') */
+  processingTextColor?: string;
 }
 
 /**

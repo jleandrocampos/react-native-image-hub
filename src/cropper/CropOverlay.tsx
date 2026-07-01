@@ -15,6 +15,8 @@ interface CropOverlayProps {
   borderWidth?: number;
   /** Show grid lines */
   showGrid?: boolean;
+  /** Grid lines color */
+  gridColor?: string;
 }
 
 /**
@@ -28,9 +30,9 @@ export function CropOverlay({
   borderColor = 'white',
   borderWidth = 2,
   showGrid = true,
+  gridColor = 'rgba(255, 255, 255, 0.3)',
 }: CropOverlayProps) {
   const gridLineWidth = 1;
-  const gridColor = 'rgba(255, 255, 255, 0.3)';
 
   return (
     <View style={styles.container} pointerEvents="none">
