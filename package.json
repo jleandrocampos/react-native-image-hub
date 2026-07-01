@@ -45,14 +45,14 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/user/react-native-image-hub.git"
+    "url": "git+https://github.com/jleandrocampos/react-native-image-hub.git"
   },
   "author": "Leandro <dev@example.com> (https://github.com)",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/user/react-native-image-hub/issues"
+    "url": "https://github.com/jleandrocampos/react-native-image-hub/issues"
   },
-  "homepage": "https://github.com/user/react-native-image-hub#readme",
+  "homepage": "https://github.com/jleandrocampos/react-native-image-hub#readme",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
   },
@@ -72,12 +72,48 @@
     "react": "19.2.3",
     "react-native": "0.85.0",
     "react-native-builder-bob": "^0.43.0",
+    "react-native-gesture-handler": "^3.0.2",
+    "react-native-reanimated": "^4.5.0",
+    "react-native-safe-area-context": "^5.8.0",
+    "react-native-svg": "^15.15.5",
+    "react-native-vision-camera": "^5.0.11",
+    "react-native-worklets": "^0.10.0",
     "turbo": "^2.9.16",
     "typescript": "^6.0.3"
   },
   "peerDependencies": {
-    "react": "*",
-    "react-native": "*"
+    "react": ">=18.0.0",
+    "react-native": ">=0.73.0",
+    "react-native-gesture-handler": ">=2.0.0",
+    "react-native-nitro-image": ">=0.20.0",
+    "react-native-nitro-modules": ">=0.20.0",
+    "react-native-reanimated": ">=3.0.0",
+    "react-native-safe-area-context": ">=5.0.0",
+    "react-native-svg": ">=15.0.0",
+    "react-native-vision-camera": ">=5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react-native-gesture-handler": {
+      "optional": false
+    },
+    "react-native-nitro-image": {
+      "optional": false
+    },
+    "react-native-nitro-modules": {
+      "optional": false
+    },
+    "react-native-reanimated": {
+      "optional": false
+    },
+    "react-native-safe-area-context": {
+      "optional": false
+    },
+    "react-native-svg": {
+      "optional": false
+    },
+    "react-native-vision-camera": {
+      "optional": false
+    }
   },
   "workspaces": [
     "example"
