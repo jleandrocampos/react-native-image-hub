@@ -1,3 +1,4 @@
+import { cameraManager } from './CameraManager';
 import {
   requestCameraPermission,
   requestGalleryPermission,
@@ -28,7 +29,7 @@ export class ImageHub {
    * @param options - Camera configuration options
    * @returns Promise resolving to the captured image
    */
-  static async openCamera(_options: CameraOptions = {}): Promise<ImageResult> {
+  static async openCamera(options: CameraOptions = {}): Promise<ImageResult> {
     const hasPermission = await requestCameraPermission();
     if (!hasPermission) {
       throw {
@@ -37,13 +38,7 @@ export class ImageHub {
       } as ImageHubError;
     }
 
-    // Camera is opened via navigation in the consuming app
-    // This method returns the configuration needed
-    throw {
-      code: 'camera_unavailable',
-      message:
-        'openCamera must be used with CameraScreen component. Use useCamera hook instead.',
-    };
+    return cameraManager.openCamera(options);
   }
 
   /**
@@ -70,9 +65,14 @@ export class ImageHub {
         maxFiles: options.maxFiles ?? 5,
       });
     } catch (nativeError: any) {
-      const msg = String(nativeError?.message || nativeError || '').toLowerCase();
+      const msg = String(
+        nativeError?.message || nativeError || ''
+      ).toLowerCase();
       if (msg.includes('cancel')) {
-        throw { code: 'cancelled', message: 'Selecao cancelada' } as ImageHubError;
+        throw {
+          code: 'cancelled',
+          message: 'Selecao cancelada',
+        } as ImageHubError;
       }
       throw {
         code: 'unknown',

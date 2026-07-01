@@ -67,7 +67,8 @@ export function CropperScreen({
 
   const s = { ...defaultStyles, ...options.styles };
   const tintColor = options.cropperTintColor || s.borderColor || '#5f8dd3';
-  const widgetColor = options.cropperToolbarWidgetColor || s.cancelColor || tintColor;
+  const widgetColor =
+    options.cropperToolbarWidgetColor || s.cancelColor || tintColor;
 
   const imageAspect =
     imageDimensions.width > 0
@@ -195,7 +196,13 @@ export function CropperScreen({
 
   if (isLoading) {
     return (
-      <View style={[styles.container, styles.center, { backgroundColor: s.backgroundColor }]}>
+      <View
+        style={[
+          styles.container,
+          styles.center,
+          { backgroundColor: s.backgroundColor },
+        ]}
+      >
         <ActivityIndicator size="large" color="white" />
       </View>
     );
@@ -249,26 +256,38 @@ export function CropperScreen({
                 gridColor={s.gridColor}
               />
 
-                <CropHandles
-                  cropWidth={cropW}
-                  cropHeight={cropH}
-                  minWidth={MIN_CROP}
-                  minHeight={MIN_CROP}
-                  maxWidth={imgDisplayW}
-                  maxHeight={imgDisplayH}
-                  borderColor={s.handleColor || tintColor}
-                  onCropResize={handleCropResize}
-                />
+              <CropHandles
+                cropWidth={cropW}
+                cropHeight={cropH}
+                minWidth={MIN_CROP}
+                minHeight={MIN_CROP}
+                maxWidth={imgDisplayW}
+                maxHeight={imgDisplayH}
+                borderColor={s.handleColor || tintColor}
+                onCropResize={handleCropResize}
+              />
             </Animated.View>
           </GestureDetector>
         </View>
       </View>
 
       {isProcessing && (
-        <View style={[styles.processingOverlay, { backgroundColor: s.processingBackground }]}>
-          <View style={[styles.processingCard, { backgroundColor: s.processingCardBackground }]}>
+        <View
+          style={[
+            styles.processingOverlay,
+            { backgroundColor: s.processingBackground },
+          ]}
+        >
+          <View
+            style={[
+              styles.processingCard,
+              { backgroundColor: s.processingCardBackground },
+            ]}
+          >
             <ActivityIndicator size="large" color={s.processingTextColor} />
-            <Text style={[styles.processingText, { color: s.processingTextColor }]}>
+            <Text
+              style={[styles.processingText, { color: s.processingTextColor }]}
+            >
               Processando...
             </Text>
           </View>

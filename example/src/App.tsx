@@ -10,7 +10,11 @@ import {
 } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { ImageHub, CameraScreen, CropperScreen } from 'react-native-image-hub';
+import ImagePicker, {
+  ImageHub,
+  CameraScreen,
+  CropperScreen,
+} from 'react-native-image-hub';
 import type { ImageResult, CropperOptions } from 'react-native-image-hub';
 
 const OVERLAY_EXAMPLES = [
@@ -36,9 +40,28 @@ export default function App() {
   const [image, setImage] = useState<ImageResult | null>(null);
   const [showCamera, setShowCamera] = useState(false);
   const [showCameraOverlay, setShowCameraOverlay] = useState(false);
-  const [showCameraOverlayNoModal, setShowCameraOverlayNoModal] = useState(false);
+  const [showCameraOverlayNoModal, setShowCameraOverlayNoModal] =
+    useState(false);
   const [showCropper, setShowCropper] = useState(false);
   const [cropperUri, setCropperUri] = useState('');
+
+  const handleDirectCamera = async () => {
+    try {
+      const result = await ImagePicker.openCamera({
+        cropping: true,
+        width: 500,
+        height: 500,
+        compressImageQuality: 0.8,
+        includeBase64: true,
+        showGrid: true,
+      });
+      setImage(result);
+    } catch (error: any) {
+      if (error.code !== 'cancelled') {
+        Alert.alert('Erro', error.message || 'Falha ao abrir câmera');
+      }
+    }
+  };
 
   const handleOpenPicker = async () => {
     try {
@@ -120,12 +143,21 @@ export default function App() {
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
         <View style={styles.container}>
-
           <View style={styles.buttons}>
             <Button title="Abrir Galeria" onPress={handleOpenPicker} />
             <Button title="Abrir Câmera" onPress={() => setShowCamera(true)} />
-            <Button title="Overlay + Modal" onPress={() => setShowCameraOverlay(true)} />
-            <Button title="Overlay Sem Modal" onPress={() => setShowCameraOverlayNoModal(true)} />
+            <Button
+              title="Câmera Direta (Promise)"
+              onPress={handleDirectCamera}
+            />
+            <Button
+              title="Overlay + Modal"
+              onPress={() => setShowCameraOverlay(true)}
+            />
+            <Button
+              title="Overlay Sem Modal"
+              onPress={() => setShowCameraOverlayNoModal(true)}
+            />
             <Button title="Abrir Cropper" onPress={handleOpenCropper} />
           </View>
 

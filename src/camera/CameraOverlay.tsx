@@ -16,7 +16,13 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CaptureButton } from './CaptureButton';
 import { MergePreview, type MergePreviewHandle } from './MergePreview';
-import { CloseIcon, RotateIcon, FlashIcon, GridIcon, RatioIcon } from './CameraIcons';
+import {
+  CloseIcon,
+  RotateIcon,
+  FlashIcon,
+  GridIcon,
+  RatioIcon,
+} from './CameraIcons';
 import { requestCameraPermission } from '../utils/permissions';
 import { processImage, cropToAspectRatio } from '../utils/imageProcessing';
 import type { CameraOptions, CameraOverlayItem, ImageResult } from '../types';
@@ -334,7 +340,10 @@ export function CameraOverlay({
       <View style={[styles.container, styles.center]}>
         <TouchableOpacity
           onPress={onCancel}
-          style={[styles.iconButton, { position: 'absolute', top: insets.top + 8, left: 16 }]}
+          style={[
+            styles.iconButton,
+            { position: 'absolute', top: insets.top + 8, left: 16 },
+          ]}
         >
           <CloseIcon size={22} color="white" />
         </TouchableOpacity>
@@ -350,7 +359,10 @@ export function CameraOverlay({
       <View style={[styles.container, styles.center]}>
         <TouchableOpacity
           onPress={onCancel}
-          style={[styles.iconButton, { position: 'absolute', top: insets.top + 8, left: 16 }]}
+          style={[
+            styles.iconButton,
+            { position: 'absolute', top: insets.top + 8, left: 16 },
+          ]}
         >
           <CloseIcon size={22} color="white" />
         </TouchableOpacity>
@@ -418,15 +430,33 @@ export function CameraOverlay({
         {/* Grid overlay */}
         {showGrid && (
           <View style={styles.gridContainer} pointerEvents="none">
-            <View style={[styles.gridLine, styles.gridVertical, { left: '33.33%' }]} />
-            <View style={[styles.gridLine, styles.gridVertical, { left: '66.66%' }]} />
-            <View style={[styles.gridLine, styles.gridHorizontal, { top: '33.33%' }]} />
-            <View style={[styles.gridLine, styles.gridHorizontal, { top: '66.66%' }]} />
+            <View
+              style={[styles.gridLine, styles.gridVertical, { left: '33.33%' }]}
+            />
+            <View
+              style={[styles.gridLine, styles.gridVertical, { left: '66.66%' }]}
+            />
+            <View
+              style={[
+                styles.gridLine,
+                styles.gridHorizontal,
+                { top: '33.33%' },
+              ]}
+            />
+            <View
+              style={[
+                styles.gridLine,
+                styles.gridHorizontal,
+                { top: '66.66%' },
+              ]}
+            />
           </View>
         )}
 
         {/* Aspect ratio guide overlays */}
-        {showAspectRatio && aspectRatio !== '4:3' && <AspectRatioGuide ratio={aspectRatio} />}
+        {showAspectRatio && aspectRatio !== '4:3' && (
+          <AspectRatioGuide ratio={aspectRatio} />
+        )}
 
         <View style={[styles.topGradient, { height: insets.top + 80 }]} />
 
@@ -506,7 +536,14 @@ export function CameraOverlay({
         {renderOverlays()}
 
         {shouldMerge && !shouldShowModal && base64Photo && (
-          <View style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden' }}>
+          <View
+            style={{
+              position: 'absolute',
+              width: 0,
+              height: 0,
+              overflow: 'hidden',
+            }}
+          >
             <MergePreview
               ref={mergeRef}
               base64Photo={base64Photo}
@@ -534,7 +571,10 @@ function AspectRatioGuide({ ratio }: { ratio: AspectRatio }) {
     return null;
   }
 
-  const scale = Math.min(SCREEN_WIDTH / guideWidth, SCREEN_HEIGHT / guideHeight);
+  const scale = Math.min(
+    SCREEN_WIDTH / guideWidth,
+    SCREEN_HEIGHT / guideHeight
+  );
   const w = guideWidth * scale;
   const h = guideHeight * scale;
 

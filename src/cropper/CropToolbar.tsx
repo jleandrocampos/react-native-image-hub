@@ -66,20 +66,33 @@ export function CropToolbar({
         },
       ]}
     >
-      <Text style={[styles.title, { color: titleColorProp || '#333', fontSize: titleSize }]}>
+      <Text
+        style={[
+          styles.title,
+          { color: titleColorProp || '#333', fontSize: titleSize },
+        ]}
+      >
         {title}
       </Text>
 
       <View style={styles.buttonRow}>
         <TouchableOpacity onPress={onCancel} style={styles.button}>
-          <Text style={[styles.buttonText, { color: widgetColor, fontSize: cancelSize }]}>
+          <Text
+            style={[
+              styles.buttonText,
+              { color: widgetColor, fontSize: cancelSize },
+            ]}
+          >
             {cancelText}
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity onPress={onConfirm} style={styles.button}>
           <Text
-            style={[styles.buttonText, { color: tintColor, fontWeight: '600', fontSize: confirmSize }]}
+            style={[
+              styles.buttonText,
+              { color: tintColor, fontWeight: '600', fontSize: confirmSize },
+            ]}
           >
             {confirmText}
           </Text>

@@ -16,7 +16,13 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CaptureButton } from './CaptureButton';
 import { CameraOverlay } from './CameraOverlay';
-import { CloseIcon, RotateIcon, FlashIcon, GridIcon, RatioIcon } from './CameraIcons';
+import {
+  CloseIcon,
+  RotateIcon,
+  FlashIcon,
+  GridIcon,
+  RatioIcon,
+} from './CameraIcons';
 import { requestCameraPermission } from '../utils/permissions';
 import { CropperScreen } from '../cropper/CropperScreen';
 import { cropToAspectRatio } from '../utils/imageProcessing';
@@ -226,15 +232,33 @@ export function CameraScreen({
         {/* Grid overlay */}
         {showGrid && (
           <View style={[styles.gridContainer]} pointerEvents="none">
-            <View style={[styles.gridLine, styles.gridVertical, { left: '33.33%' }]} />
-            <View style={[styles.gridLine, styles.gridVertical, { left: '66.66%' }]} />
-            <View style={[styles.gridLine, styles.gridHorizontal, { top: '33.33%' }]} />
-            <View style={[styles.gridLine, styles.gridHorizontal, { top: '66.66%' }]} />
+            <View
+              style={[styles.gridLine, styles.gridVertical, { left: '33.33%' }]}
+            />
+            <View
+              style={[styles.gridLine, styles.gridVertical, { left: '66.66%' }]}
+            />
+            <View
+              style={[
+                styles.gridLine,
+                styles.gridHorizontal,
+                { top: '33.33%' },
+              ]}
+            />
+            <View
+              style={[
+                styles.gridLine,
+                styles.gridHorizontal,
+                { top: '66.66%' },
+              ]}
+            />
           </View>
         )}
 
         {/* Aspect ratio guide overlays */}
-        {showAspectRatio && aspectRatio !== '4:3' && <AspectRatioGuide ratio={aspectRatio} />}
+        {showAspectRatio && aspectRatio !== '4:3' && (
+          <AspectRatioGuide ratio={aspectRatio} />
+        )}
 
         {/* Top bar gradient overlay */}
         <View style={[styles.topGradient, { height: insets.top + 80 }]} />

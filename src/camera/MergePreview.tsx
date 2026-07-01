@@ -68,19 +68,20 @@ export const MergePreview = forwardRef<MergePreviewHandle, MergePreviewProps>(
       }
     }, [onMerged]);
 
-    useImperativeHandle(ref, () => ({
-      capture,
-    }), [capture]);
+    useImperativeHandle(
+      ref,
+      () => ({
+        capture,
+      }),
+      [capture]
+    );
 
     const getPreserveAspectRatio = (item: CameraOverlayItem): string => {
       return item.preserveAspectRatio ?? 'xMidYMid meet';
     };
 
     return (
-      <View
-        style={[styles.container, { width, height }]}
-        collapsable={false}
-      >
+      <View style={[styles.container, { width, height }]} collapsable={false}>
         <Svg
           ref={svgRef as any}
           width="100%"

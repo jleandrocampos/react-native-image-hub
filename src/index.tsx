@@ -1,4 +1,6 @@
+import { AppRegistry } from 'react-native';
 import { ImageHub } from './ImageHub';
+import { ImagePickerProvider } from './ImagePickerProvider';
 import type { CameraOptions, PickerOptions, CropperOptions } from './types';
 
 // Camera exports
@@ -8,6 +10,8 @@ export { MergePreview } from './camera/MergePreview';
 export type { MergePreviewHandle } from './camera/MergePreview';
 export { CaptureButton } from './camera/CaptureButton';
 export { useCamera } from './camera/useCamera';
+export { ImagePickerProvider } from './ImagePickerProvider';
+export { cameraManager } from './CameraManager';
 
 // Gallery exports
 export { useGallery } from './gallery/useGallery';
@@ -56,5 +60,17 @@ export const ImagePicker = {
   openPicker: (options: PickerOptions) => ImageHub.openPicker(options),
   openCropper: (options: CropperOptions) => ImageHub.openCropper(options),
 };
+
+// Automatic wrapper registration to enable Promise-based CameraScreen overlays
+// without requiring manual root configuration.
+try {
+  AppRegistry.setWrapperComponentProvider(() => {
+    return (props: any) => (
+      <ImagePickerProvider>{props.children}</ImagePickerProvider>
+    );
+  });
+} catch {
+  // Silent fail in non-RN/test environments
+}
 
 export default ImagePicker;

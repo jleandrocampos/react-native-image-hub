@@ -148,38 +148,10 @@ export function GridIcon({ size = 28, color = 'white' }: IconProps) {
         stroke={color}
         strokeWidth={1.8}
       />
-      <Line
-        x1="9"
-        y1="3"
-        x2="9"
-        y2="21"
-        stroke={color}
-        strokeWidth={1.5}
-      />
-      <Line
-        x1="15"
-        y1="3"
-        x2="15"
-        y2="21"
-        stroke={color}
-        strokeWidth={1.5}
-      />
-      <Line
-        x1="3"
-        y1="9"
-        x2="21"
-        y2="9"
-        stroke={color}
-        strokeWidth={1.5}
-      />
-      <Line
-        x1="3"
-        y1="15"
-        x2="21"
-        y2="15"
-        stroke={color}
-        strokeWidth={1.5}
-      />
+      <Line x1="9" y1="3" x2="9" y2="21" stroke={color} strokeWidth={1.5} />
+      <Line x1="15" y1="3" x2="15" y2="21" stroke={color} strokeWidth={1.5} />
+      <Line x1="3" y1="9" x2="21" y2="9" stroke={color} strokeWidth={1.5} />
+      <Line x1="3" y1="15" x2="21" y2="15" stroke={color} strokeWidth={1.5} />
     </Svg>
   );
 }

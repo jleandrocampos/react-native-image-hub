@@ -96,11 +96,12 @@ export function useCamera(options: CameraOptions = {}): UseCameraReturn {
     try {
       const photo = await photoOutput.capturePhotoToFile(
         {
-          flashMode: flashMode === 'on'
-            ? ('on' as const)
-            : flashMode === 'off'
-              ? ('off' as const)
-              : ('auto' as const),
+          flashMode:
+            flashMode === 'on'
+              ? ('on' as const)
+              : flashMode === 'off'
+                ? ('off' as const)
+                : ('auto' as const),
           enableShutterSound: true,
         },
         {}
