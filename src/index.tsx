@@ -56,3 +56,5 @@ export const ImagePicker = {
   openPicker: (options: PickerOptions) => ImageHub.openPicker(options),
   openCropper: (options: CropperOptions) => ImageHub.openCropper(options),
 };
+
+export default ImagePicker;
