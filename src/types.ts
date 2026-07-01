@@ -34,10 +34,16 @@ export interface CameraOptions extends BaseOptions {
   useFrontCamera?: boolean;
   /** Flash mode (default: 'auto') */
   flashMode?: 'auto' | 'on' | 'off';
-  /** Show rule of thirds grid overlay (default: true) */
+  /** Show flash toggle button (default: false) */
+  showFlash?: boolean;
+  /** Show rule of thirds grid overlay (default: false) */
   showGrid?: boolean;
+  /** Show aspect ratio toggle button (default: false) */
+  showAspectRatio?: boolean;
   /** Camera aspect ratio (default: '4:3') */
   aspectRatio?: '4:3' | '16:9' | '1:1';
+  /** Show zoom indicator (default: false) */
+  showZoom?: boolean;
   /** Initial zoom level (default: 1) */
   zoom?: number;
   /** Overlay images to display on top of the camera */

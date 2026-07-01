@@ -143,16 +143,18 @@ export async function cropToAspectRatio(
     offsetY = Math.round((srcH - cropH) / 2);
   }
 
-  return ImageHub.cropImage(
+  const result = await ImageHub.cropImage(
     uri,
     offsetX,
     offsetY,
     cropW,
     cropH,
-    0, // displayWidth (0 = keep original size)
-    0, // displayHeight (0 = keep original size)
+    0,
+    0,
     0.9,
     'jpeg',
     false
   );
+
+  return result.uri;
 }

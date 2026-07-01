@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -87,16 +87,16 @@ export function CameraOverlay({
   const [flashMode, setFlashMode] = useState<FlashMode>(
     options.flashMode ?? 'auto'
   );
-  const [showGrid, setShowGrid] = useState(options.showGrid !== false);
+  const [showFlash] = useState(options.showFlash === true);
+  const [showGrid, setShowGrid] = useState(options.showGrid === true);
+  const [showAspectRatio] = useState(options.showAspectRatio === true);
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>(
     options.aspectRatio ?? '4:3'
   );
+  const [showZoom] = useState(options.showZoom === true);
   const [zoom, setZoom] = useState(options.zoom ?? 1);
-  const [cameraReady, setCameraReady] = useState(false);
   const isProcessingRef = useRef(false);
   const baseZoomRef = useRef(1);
-  const zoomDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingZoomRef = useRef(1);
 
   const device = useCameraDevice(cameraPosition);
   const photoOutput = usePhotoOutput({
@@ -113,34 +113,6 @@ export function CameraOverlay({
     requestCameraPermission().then((granted) => {
       setHasPermission(granted);
     });
-  }, []);
-
-  // Reset zoom and camera ready state when switching cameras
-  useEffect(() => {
-    setCameraReady(false);
-    setZoom(1);
-    // Mark camera as ready after a short delay to allow initialization
-    const timer = setTimeout(() => setCameraReady(true), 300);
-    return () => clearTimeout(timer);
-  }, [cameraPosition]);
-
-  // Debounced zoom setter
-  const setZoomSafe = useCallback((value: number) => {
-    pendingZoomRef.current = value;
-    if (zoomDebounceRef.current) {
-      clearTimeout(zoomDebounceRef.current);
-    }
-    zoomDebounceRef.current = setTimeout(() => {
-      setZoom(pendingZoomRef.current);
-    }, 50);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (zoomDebounceRef.current) {
-        clearTimeout(zoomDebounceRef.current);
-      }
-    };
   }, []);
 
   const toggleCamera = () => {
@@ -173,7 +145,7 @@ export function CameraOverlay({
       baseZoomRef.current = zoom;
     })
     .onUpdate((e) => {
-      setZoomSafe(clampZoom(baseZoomRef.current * e.scale));
+      setZoom(clampZoom(baseZoomRef.current * e.scale));
     });
 
   const finishCapture = async (uri: string) => {
@@ -441,7 +413,6 @@ export function CameraOverlay({
           isActive={true}
           outputs={[photoOutput]}
           resizeMode="cover"
-          zoom={cameraReady ? zoom : 1}
         />
 
         {/* Grid overlay */}
@@ -455,7 +426,7 @@ export function CameraOverlay({
         )}
 
         {/* Aspect ratio guide overlays */}
-        {aspectRatio !== '4:3' && <AspectRatioGuide ratio={aspectRatio} />}
+        {showAspectRatio && aspectRatio !== '4:3' && <AspectRatioGuide ratio={aspectRatio} />}
 
         <View style={[styles.topGradient, { height: insets.top + 80 }]} />
 
@@ -468,26 +439,32 @@ export function CameraOverlay({
             <CloseIcon size={22} color="white" />
           </TouchableOpacity>
 
-          <View style={styles.topCenterButtons}>
-            <TouchableOpacity
-              onPress={cycleFlash}
-              style={styles.iconButton}
-              activeOpacity={0.7}
-            >
-              <FlashIcon size={22} color="white" mode={flashMode} />
-            </TouchableOpacity>
+          {(showFlash || showGrid) && (
+            <View style={styles.topCenterButtons}>
+              {showFlash && (
+                <TouchableOpacity
+                  onPress={cycleFlash}
+                  style={styles.iconButton}
+                  activeOpacity={0.7}
+                >
+                  <FlashIcon size={22} color="white" mode={flashMode} />
+                </TouchableOpacity>
+              )}
 
-            <TouchableOpacity
-              onPress={() => setShowGrid((prev) => !prev)}
-              style={[
-                styles.iconButton,
-                showGrid && styles.iconButtonActive,
-              ]}
-              activeOpacity={0.7}
-            >
-              <GridIcon size={20} color="white" />
-            </TouchableOpacity>
-          </View>
+              {showGrid && (
+                <TouchableOpacity
+                  onPress={() => setShowGrid((prev) => !prev)}
+                  style={[
+                    styles.iconButton,
+                    showGrid && styles.iconButtonActive,
+                  ]}
+                  activeOpacity={0.7}
+                >
+                  <GridIcon size={20} color="white" />
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
 
           <View style={{ flex: 1 }} />
 
@@ -504,21 +481,25 @@ export function CameraOverlay({
 
         <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 24 }]}>
           <View style={styles.bottomBarRow}>
-            <TouchableOpacity
-              onPress={cycleAspectRatio}
-              style={styles.ratioButton}
-              activeOpacity={0.7}
-            >
-              <RatioIcon size={20} color="white" ratio={aspectRatio} />
-            </TouchableOpacity>
+            {showAspectRatio && (
+              <TouchableOpacity
+                onPress={cycleAspectRatio}
+                style={styles.ratioButton}
+                activeOpacity={0.7}
+              >
+                <RatioIcon size={20} color="white" ratio={aspectRatio} />
+              </TouchableOpacity>
+            )}
 
             <CaptureButton onPress={handleCapture} disabled={isCapturing} />
 
-            <View style={styles.zoomIndicator}>
-              <Text style={styles.zoomText}>
-                {zoom >= 10 ? `${Math.round(zoom)}x` : `${zoom.toFixed(1)}x`}
-              </Text>
-            </View>
+            {showZoom && (
+              <View style={styles.zoomIndicator}>
+                <Text style={styles.zoomText}>
+                  {zoom >= 10 ? `${Math.round(zoom)}x` : `${zoom.toFixed(1)}x`}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
 
