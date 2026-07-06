@@ -13,8 +13,8 @@ export async function applyCrop(
 ): Promise<ImageResult> {
   const quality = options.compressImageQuality ?? 0.8;
   const includeBase64 = options.includeBase64 ?? false;
-  const targetWidth = options.width ?? 500;
-  const targetHeight = options.height ?? 500;
+  const targetWidth = options.width ?? options.height ?? 500;
+  const targetHeight = targetWidth;
 
   try {
     const result = await ImageHub.cropImage(

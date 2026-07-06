@@ -1,12 +1,12 @@
-import { View, StyleSheet, Dimensions } from 'react-native';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+import { View, StyleSheet } from 'react-native';
+import Animated, { useAnimatedStyle } from 'react-native-reanimated';
+import type { SharedValue } from 'react-native-reanimated';
 
 interface CropOverlayProps {
-  /** Width of the crop area */
-  cropWidth?: number;
-  /** Height of the crop area */
-  cropHeight?: number;
+  /** Width of the crop area as a shared value */
+  cropWidth: SharedValue<number>;
+  /** Height of the crop area as a shared value */
+  cropHeight: SharedValue<number>;
   /** Overlay color */
   overlayColor?: string;
   /** Border color of crop area */
@@ -24,8 +24,8 @@ interface CropOverlayProps {
  * Renders a semi-transparent overlay with a transparent "window" for the crop region.
  */
 export function CropOverlay({
-  cropWidth = SCREEN_WIDTH * 0.85,
-  cropHeight = SCREEN_WIDTH * 0.85,
+  cropWidth,
+  cropHeight,
   overlayColor = 'rgba(0, 0, 0, 0.5)',
   borderColor = 'white',
   borderWidth = 2,
@@ -33,6 +33,37 @@ export function CropOverlay({
   gridColor = 'rgba(255, 255, 255, 0.3)',
 }: CropOverlayProps) {
   const gridLineWidth = 1;
+
+  const middleRowStyle = useAnimatedStyle(() => ({
+    height: cropHeight.value,
+  }));
+
+  const cropAreaStyle = useAnimatedStyle(() => ({
+    width: cropWidth.value,
+    height: cropHeight.value,
+    borderColor: borderColor,
+    borderWidth: borderWidth,
+  }));
+
+  const verticalLine1Style = useAnimatedStyle(() => ({
+    left: cropWidth.value / 3,
+    height: cropHeight.value,
+  }));
+
+  const verticalLine2Style = useAnimatedStyle(() => ({
+    left: (cropWidth.value / 3) * 2,
+    height: cropHeight.value,
+  }));
+
+  const horizontalLine1Style = useAnimatedStyle(() => ({
+    top: cropHeight.value / 3,
+    width: cropWidth.value,
+  }));
+
+  const horizontalLine2Style = useAnimatedStyle(() => ({
+    top: (cropHeight.value / 3) * 2,
+    width: cropWidth.value,
+  }));
 
   return (
     <View style={styles.container} pointerEvents="none">
@@ -47,7 +78,7 @@ export function CropOverlay({
       />
 
       {/* Middle section with crop window */}
-      <View style={[styles.middleRow, { height: cropHeight }]}>
+      <Animated.View style={[styles.middleRow, middleRowStyle]}>
         {/* Left overlay */}
         <View
           style={[
@@ -59,38 +90,26 @@ export function CropOverlay({
         />
 
         {/* Crop area with border */}
-        <View
-          style={[
-            styles.cropArea,
-            {
-              width: cropWidth,
-              height: cropHeight,
-              borderColor: borderColor,
-              borderWidth: borderWidth,
-            },
-          ]}
-        >
+        <Animated.View style={[styles.cropArea, cropAreaStyle]}>
           {/* Grid lines */}
           {showGrid && (
             <>
               {/* Vertical lines */}
-              <View
+              <Animated.View
                 style={[
                   styles.verticalLine,
+                  verticalLine1Style,
                   {
-                    left: cropWidth / 3,
-                    height: cropHeight,
                     width: gridLineWidth,
                     backgroundColor: gridColor,
                   },
                 ]}
               />
-              <View
+              <Animated.View
                 style={[
                   styles.verticalLine,
+                  verticalLine2Style,
                   {
-                    left: (cropWidth / 3) * 2,
-                    height: cropHeight,
                     width: gridLineWidth,
                     backgroundColor: gridColor,
                   },
@@ -98,23 +117,21 @@ export function CropOverlay({
               />
 
               {/* Horizontal lines */}
-              <View
+              <Animated.View
                 style={[
                   styles.horizontalLine,
+                  horizontalLine1Style,
                   {
-                    top: cropHeight / 3,
-                    width: cropWidth,
                     height: gridLineWidth,
                     backgroundColor: gridColor,
                   },
                 ]}
               />
-              <View
+              <Animated.View
                 style={[
                   styles.horizontalLine,
+                  horizontalLine2Style,
                   {
-                    top: (cropHeight / 3) * 2,
-                    width: cropWidth,
                     height: gridLineWidth,
                     backgroundColor: gridColor,
                   },
@@ -139,7 +156,7 @@ export function CropOverlay({
               ))}
             </>
           )}
-        </View>
+        </Animated.View>
 
         {/* Right overlay */}
         <View
@@ -150,7 +167,7 @@ export function CropOverlay({
             },
           ]}
         />
-      </View>
+      </Animated.View>
 
       {/* Bottom overlay */}
       <View

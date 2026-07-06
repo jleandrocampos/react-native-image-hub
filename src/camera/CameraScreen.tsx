@@ -28,10 +28,10 @@ import { CropperScreen } from '../cropper/CropperScreen';
 import { cropToAspectRatio } from '../utils/imageProcessing';
 import type { CameraOptions, ImageResult } from '../types';
 
-type FlashMode = 'auto' | 'on' | 'off';
+type FlashMode = 'on' | 'off';
 type AspectRatio = '4:3' | '16:9' | '1:1';
 
-const FLASH_CYCLE: FlashMode[] = ['auto', 'on', 'off'];
+const FLASH_CYCLE: FlashMode[] = ['off', 'on'];
 const RATIO_CYCLE: AspectRatio[] = ['4:3', '16:9', '1:1'];
 
 interface CameraScreenProps {
@@ -55,7 +55,7 @@ export function CameraScreen({
   const [isCapturing, setIsCapturing] = useState(false);
   const [capturedUri, setCapturedUri] = useState<string | null>(null);
   const [flashMode, setFlashMode] = useState<FlashMode>(
-    options.flashMode ?? 'auto'
+    options.flashMode ?? 'off'
   );
   const [showFlash] = useState(options.showFlash === true);
   const [showGrid, setShowGrid] = useState(options.showGrid === true);
@@ -131,15 +131,10 @@ export function CameraScreen({
     setIsCapturing(true);
 
     try {
-      const resolvedFlash =
-        flashMode === 'on'
-          ? ('on' as const)
-          : flashMode === 'off'
-            ? ('off' as const)
-            : ('auto' as const);
+      const resolvedFlash = flashMode === 'on' ? ('on' as const) : ('off' as const);
 
       const photo = await photoOutput.capturePhotoToFile(
-        { flashMode: resolvedFlash, enableShutterSound: true },
+        { flashMode: resolvedFlash, enableShutterSound: options.enableShutterSound === true },
         {}
       );
 
@@ -264,7 +259,7 @@ export function CameraScreen({
         <View style={[styles.topGradient, { height: insets.top + 80 }]} />
 
         {/* Top bar */}
-        <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
+        <View style={[styles.topBar, { paddingTop: insets.top }]}>
           <TouchableOpacity
             onPress={onCancel}
             style={styles.iconButton}
@@ -273,7 +268,7 @@ export function CameraScreen({
             <CloseIcon size={22} color="white" />
           </TouchableOpacity>
 
-          {(showFlash || showGrid) && (
+          {(showFlash || options.showGrid === true) && (
             <View style={styles.topCenterButtons}>
               {showFlash && (
                 <TouchableOpacity
@@ -285,7 +280,7 @@ export function CameraScreen({
                 </TouchableOpacity>
               )}
 
-              {showGrid && (
+              {options.showGrid === true && (
                 <TouchableOpacity
                   onPress={() => setShowGrid((prev) => !prev)}
                   style={[
@@ -312,10 +307,10 @@ export function CameraScreen({
         </View>
 
         {/* Bottom bar gradient overlay */}
-        <View style={[styles.bottomGradient, { height: 160 }]} />
+        <View style={[styles.bottomGradient, { height: 120 }]} />
 
         {/* Bottom bar */}
-        <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 24 }]}>
+        <View style={[styles.bottomBar]}>
           <View style={styles.bottomBarRow}>
             {showAspectRatio && (
               <TouchableOpacity
@@ -474,7 +469,7 @@ const styles = StyleSheet.create({
     right: 0,
     alignItems: 'center',
     paddingTop: 24,
-    paddingBottom: 32,
+    paddingBottom: 28,
     zIndex: 10,
   },
   bottomBarRow: {

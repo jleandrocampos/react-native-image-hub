@@ -5,7 +5,7 @@ interface IconProps {
   color?: string;
 }
 
-type FlashMode = 'auto' | 'on' | 'off';
+type FlashMode = 'on' | 'off';
 
 /**
  * Minimalist close (X) icon — iOS style.
@@ -63,36 +63,13 @@ export function RotateIcon({ size = 28, color = 'white' }: IconProps) {
 }
 
 /**
- * Flash / torch icon with three modes: auto, on, off.
+ * Flash / torch icon with two modes: on, off.
  */
 export function FlashIcon({
   size = 28,
   color = 'white',
-  mode = 'auto',
+  mode = 'off',
 }: IconProps & { mode?: FlashMode }) {
-  if (mode === 'off') {
-    return (
-      <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-        <Path
-          d="M13 2L4.5 12.5h6L9 22l9.5-12.5h-6L13 2z"
-          stroke={color}
-          strokeWidth={1.8}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <Line
-          x1="4"
-          y1="4"
-          x2="20"
-          y2="20"
-          stroke={color}
-          strokeWidth={2}
-          strokeLinecap="round"
-        />
-      </Svg>
-    );
-  }
-
   if (mode === 'on') {
     return (
       <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
@@ -108,7 +85,7 @@ export function FlashIcon({
     );
   }
 
-  // auto — lightning bolt with "A" indicator
+  // off
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path
@@ -118,17 +95,15 @@ export function FlashIcon({
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <SvgText
-        x="12"
-        y="13.5"
-        textAnchor="middle"
-        fontSize="8"
-        fontWeight="bold"
-        fill={color}
-        fontFamily="system"
-      >
-        A
-      </SvgText>
+      <Line
+        x1="4"
+        y1="4"
+        x2="20"
+        y2="20"
+        stroke={color}
+        strokeWidth={2}
+        strokeLinecap="round"
+      />
     </Svg>
   );
 }

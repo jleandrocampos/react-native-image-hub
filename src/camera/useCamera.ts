@@ -3,7 +3,7 @@ import { useCameraDevice, usePhotoOutput } from 'react-native-vision-camera';
 import { requestCameraPermission } from '../utils/permissions';
 import type { CameraOptions } from '../types';
 
-export type FlashMode = 'auto' | 'on' | 'off';
+export type FlashMode = 'on' | 'off';
 
 export interface UseCameraReturn {
   /** Whether camera permission is granted */
@@ -30,7 +30,7 @@ export interface UseCameraReturn {
   isCapturing: boolean;
 }
 
-const FLASH_CYCLE: FlashMode[] = ['auto', 'on', 'off'];
+const FLASH_CYCLE: FlashMode[] = ['off', 'on'];
 
 /**
  * Hook for managing camera functionality.
@@ -41,7 +41,7 @@ export function useCamera(options: CameraOptions = {}): UseCameraReturn {
     options.useFrontCamera ? 'front' : 'back'
   );
   const [flashMode, setFlashMode] = useState<FlashMode>(
-    options.flashMode ?? 'auto'
+    options.flashMode ?? 'off'
   );
   const [zoom, setZoomState] = useState(options.zoom ?? 1);
   const [isCapturing, setIsCapturing] = useState(false);
@@ -96,13 +96,8 @@ export function useCamera(options: CameraOptions = {}): UseCameraReturn {
     try {
       const photo = await photoOutput.capturePhotoToFile(
         {
-          flashMode:
-            flashMode === 'on'
-              ? ('on' as const)
-              : flashMode === 'off'
-                ? ('off' as const)
-                : ('auto' as const),
-          enableShutterSound: true,
+          flashMode: flashMode as 'on' | 'off',
+          enableShutterSound: options.enableShutterSound === true,
         },
         {}
       );
@@ -115,7 +110,7 @@ export function useCamera(options: CameraOptions = {}): UseCameraReturn {
       isProcessingRef.current = false;
       setIsCapturing(false);
     }
-  }, [photoOutput, flashMode]);
+  }, [photoOutput, flashMode, options.enableShutterSound]);
 
   return {
     hasPermission,

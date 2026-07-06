@@ -71,6 +71,7 @@ export default function App() {
         height: 500,
         compressImageQuality: 0.8,
         includeBase64: true,
+        multiple: true
       });
 
       if (Array.isArray(result)) {

@@ -30,10 +30,10 @@ import type { CameraOptions, CameraOverlayItem, ImageResult } from '../types';
 const { NativeModules } = require('react-native');
 const { ImageHub } = NativeModules;
 
-type FlashMode = 'auto' | 'on' | 'off';
+type FlashMode = 'on' | 'off';
 type AspectRatio = '4:3' | '16:9' | '1:1';
 
-const FLASH_CYCLE: FlashMode[] = ['auto', 'on', 'off'];
+const FLASH_CYCLE: FlashMode[] = ['off', 'on'];
 const RATIO_CYCLE: AspectRatio[] = ['4:3', '16:9', '1:1'];
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -91,7 +91,7 @@ export function CameraOverlay({
   const [base64Photo, setBase64Photo] = useState<string>('');
   const [showConfirm, setShowConfirm] = useState(false);
   const [flashMode, setFlashMode] = useState<FlashMode>(
-    options.flashMode ?? 'auto'
+    options.flashMode ?? 'off'
   );
   const [showFlash] = useState(options.showFlash === true);
   const [showGrid, setShowGrid] = useState(options.showGrid === true);
@@ -177,15 +177,10 @@ export function CameraOverlay({
     setIsCapturing(true);
 
     try {
-      const resolvedFlash =
-        flashMode === 'on'
-          ? ('on' as const)
-          : flashMode === 'off'
-            ? ('off' as const)
-            : ('auto' as const);
+      const resolvedFlash = flashMode === 'on' ? ('on' as const) : ('off' as const);
 
       const photo = await photoOutput.capturePhotoToFile(
-        { flashMode: resolvedFlash, enableShutterSound: true },
+        { flashMode: resolvedFlash, enableShutterSound: options.enableShutterSound === true },
         {}
       );
 
@@ -257,8 +252,8 @@ export function CameraOverlay({
   const renderOverlays = () => {
     if (sortedOverlays.length === 0) return null;
 
-    const topOffset = insets.top + 80;
-    const bottomOffset = 160;
+    const topOffset = insets.top + 50;
+    const bottomOffset = 75;
 
     return (
       <View
@@ -458,7 +453,7 @@ export function CameraOverlay({
           <AspectRatioGuide ratio={aspectRatio} />
         )}
 
-        <View style={[styles.topGradient, { height: insets.top + 80 }]} />
+        <View style={[styles.topGradient, { height: insets.top + 50 }]} />
 
         <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
           <TouchableOpacity
@@ -469,7 +464,7 @@ export function CameraOverlay({
             <CloseIcon size={22} color="white" />
           </TouchableOpacity>
 
-          {(showFlash || showGrid) && (
+          {(showFlash || options.showGrid === true) && (
             <View style={styles.topCenterButtons}>
               {showFlash && (
                 <TouchableOpacity
@@ -481,7 +476,7 @@ export function CameraOverlay({
                 </TouchableOpacity>
               )}
 
-              {showGrid && (
+              {options.showGrid === true && (
                 <TouchableOpacity
                   onPress={() => setShowGrid((prev) => !prev)}
                   style={[
@@ -507,9 +502,9 @@ export function CameraOverlay({
           </TouchableOpacity>
         </View>
 
-        <View style={[styles.bottomGradient, { height: 160 }]} />
+        <View style={[styles.bottomGradient, { height: 75 }]} />
 
-        <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 24 }]}>
+        <View style={[styles.bottomBar, { paddingBottom: insets.bottom }]} >
           <View style={styles.bottomBarRow}>
             {showAspectRatio && (
               <TouchableOpacity
@@ -521,7 +516,7 @@ export function CameraOverlay({
               </TouchableOpacity>
             )}
 
-            <CaptureButton onPress={handleCapture} disabled={isCapturing} />
+            <CaptureButton onPress={handleCapture} disabled={isCapturing} size={48} />
 
             {showZoom && (
               <View style={styles.zoomIndicator}>
@@ -661,7 +656,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingBottom: 8,
     zIndex: 10,
   },
   topCenterButtons: {
@@ -693,15 +688,15 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     alignItems: 'center',
-    paddingTop: 24,
-    paddingBottom: 32,
+    paddingTop: 0,
+    paddingBottom: 0,
     zIndex: 10,
   },
   bottomBarRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 32,
+    gap: 24,
   },
   ratioButton: {
     width: 44,

@@ -1,6 +1,6 @@
 {
   "name": "react-native-image-hub",
-  "version": "0.1.0",
+  "version": "0.1.4",
   "description": "React Native image picker: camera (vision-camera), gallery, and custom cropper",
   "main": "./lib/module/index.js",
   "types": "./lib/typescript/src/index.d.ts",

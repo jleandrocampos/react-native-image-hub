@@ -32,8 +32,10 @@ export interface BaseOptions {
 export interface CameraOptions extends BaseOptions {
   /** Use front camera (default: false) */
   useFrontCamera?: boolean;
-  /** Flash mode (default: 'auto') */
-  flashMode?: 'auto' | 'on' | 'off';
+  /** Enable camera shutter sound (default: false) */
+  enableShutterSound?: boolean;
+  /** Flash mode (default: 'off') */
+  flashMode?: 'on' | 'off';
   /** Show flash toggle button (default: false) */
   showFlash?: boolean;
   /** Show rule of thirds grid overlay (default: false) */

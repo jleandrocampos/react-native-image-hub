@@ -1,30 +1,38 @@
 import { View, StyleSheet } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { useSharedValue, runOnJS } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
+import type { SharedValue } from 'react-native-reanimated';
 
 interface CropHandlesProps {
-  cropWidth: number;
-  cropHeight: number;
+  cropWidth: SharedValue<number>;
+  cropHeight: SharedValue<number>;
   minWidth?: number;
   minHeight?: number;
   maxWidth?: number;
   maxHeight?: number;
   borderColor?: string;
-  onCropResize: (
-    width: number,
-    height: number,
-    offsetX: number,
-    offsetY: number
-  ) => void;
 }
 
 interface HandleProps {
   position: 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight';
   borderColor: string;
-  onDrag: (dx: number, dy: number) => void;
+  cropWidth: SharedValue<number>;
+  cropHeight: SharedValue<number>;
+  minWidth: number;
+  minHeight: number;
+  maxWidth?: number;
+  maxHeight?: number;
 }
 
-function Handle({ position, onDrag }: HandleProps) {
+function Handle({
+  position,
+  cropWidth,
+  cropHeight,
+  minWidth,
+  minHeight,
+  maxWidth,
+  maxHeight,
+}: HandleProps) {
   const lastX = useSharedValue(0);
   const lastY = useSharedValue(0);
 
@@ -34,13 +42,43 @@ function Handle({ position, onDrag }: HandleProps) {
       lastY.value = 0;
     })
     .onUpdate((e: any) => {
+      'worklet';
       const dx = e.translationX - lastX.value;
       const dy = e.translationY - lastY.value;
 
       lastX.value = e.translationX;
       lastY.value = e.translationY;
 
-      runOnJS(onDrag)(dx, dy);
+      let newWidth = cropWidth.value;
+      let newHeight = cropHeight.value;
+
+      switch (position) {
+        case 'bottomRight':
+          newWidth = Math.max(minWidth, cropWidth.value + 2 * dx);
+          newHeight = Math.max(minHeight, cropHeight.value + 2 * dy);
+          break;
+        case 'bottomLeft':
+          newWidth = Math.max(minWidth, cropWidth.value - 2 * dx);
+          newHeight = Math.max(minHeight, cropHeight.value + 2 * dy);
+          break;
+        case 'topRight':
+          newWidth = Math.max(minWidth, cropWidth.value + 2 * dx);
+          newHeight = Math.max(minHeight, cropHeight.value - 2 * dy);
+          break;
+        case 'topLeft':
+          newWidth = Math.max(minWidth, cropWidth.value - 2 * dx);
+          newHeight = Math.max(minHeight, cropHeight.value - 2 * dy);
+          break;
+      }
+
+      // Enforce square shape
+      let size = Math.max(newWidth, newHeight);
+
+      if (maxWidth) size = Math.min(maxWidth, size);
+      if (maxHeight) size = Math.min(maxHeight, size);
+
+      cropWidth.value = size;
+      cropHeight.value = size;
     });
 
   const handleSize = 40;
@@ -73,67 +111,58 @@ export function CropHandles({
   maxWidth,
   maxHeight,
   borderColor = 'white',
-  onCropResize,
 }: CropHandlesProps) {
-  const handleDrag = (
-    position: 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight',
-    dx: number,
-    dy: number
-  ) => {
-    let newWidth = cropWidth;
-    let newHeight = cropHeight;
-
-    switch (position) {
-      case 'bottomRight':
-        newWidth = Math.max(minWidth, cropWidth + 2 * dx);
-        newHeight = Math.max(minHeight, cropHeight + 2 * dy);
-        break;
-      case 'bottomLeft':
-        newWidth = Math.max(minWidth, cropWidth - 2 * dx);
-        newHeight = Math.max(minHeight, cropHeight + 2 * dy);
-        break;
-      case 'topRight':
-        newWidth = Math.max(minWidth, cropWidth + 2 * dx);
-        newHeight = Math.max(minHeight, cropHeight - 2 * dy);
-        break;
-      case 'topLeft':
-        newWidth = Math.max(minWidth, cropWidth - 2 * dx);
-        newHeight = Math.max(minHeight, cropHeight - 2 * dy);
-        break;
-    }
-
-    if (maxWidth) newWidth = Math.min(maxWidth, newWidth);
-    if (maxHeight) newHeight = Math.min(maxHeight, newHeight);
-
-    onCropResize(newWidth, newHeight, 0, 0);
-  };
+  const containerStyle = useAnimatedStyle(() => ({
+    width: cropWidth.value,
+    height: cropHeight.value,
+  }));
 
   return (
-    <View
-      style={[styles.container, { width: cropWidth, height: cropHeight }]}
+    <Animated.View
+      style={[styles.container, containerStyle]}
       pointerEvents="box-none"
     >
       <Handle
         position="topLeft"
         borderColor={borderColor}
-        onDrag={(dx, dy) => handleDrag('topLeft', dx, dy)}
+        cropWidth={cropWidth}
+        cropHeight={cropHeight}
+        minWidth={minWidth}
+        minHeight={minHeight}
+        maxWidth={maxWidth}
+        maxHeight={maxHeight}
       />
       <Handle
         position="topRight"
         borderColor={borderColor}
-        onDrag={(dx, dy) => handleDrag('topRight', dx, dy)}
+        cropWidth={cropWidth}
+        cropHeight={cropHeight}
+        minWidth={minWidth}
+        minHeight={minHeight}
+        maxWidth={maxWidth}
+        maxHeight={maxHeight}
       />
       <Handle
         position="bottomLeft"
         borderColor={borderColor}
-        onDrag={(dx, dy) => handleDrag('bottomLeft', dx, dy)}
+        cropWidth={cropWidth}
+        cropHeight={cropHeight}
+        minWidth={minWidth}
+        minHeight={minHeight}
+        maxWidth={maxWidth}
+        maxHeight={maxHeight}
       />
       <Handle
         position="bottomRight"
         borderColor={borderColor}
-        onDrag={(dx, dy) => handleDrag('bottomRight', dx, dy)}
+        cropWidth={cropWidth}
+        cropHeight={cropHeight}
+        minWidth={minWidth}
+        minHeight={minHeight}
+        maxWidth={maxWidth}
+        maxHeight={maxHeight}
       />
-    </View>
+    </Animated.View>
   );
 }
 
@@ -145,5 +174,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 40,
     height: 40,
+    backgroundColor: 'transparent',
   },
 });

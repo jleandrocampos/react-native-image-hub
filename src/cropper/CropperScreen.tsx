@@ -11,7 +11,6 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   clamp,
-  runOnJS,
 } from 'react-native-reanimated';
 import { CropOverlay } from './CropOverlay';
 import { CropHandles } from './CropHandles';
@@ -84,24 +83,24 @@ export function CropperScreen({
     imgDisplayW = imgDisplayH * imageAspect;
   }
 
-  const initialHeight = options.height
-    ? INITIAL_CROP * (options.height / (options.width ?? options.height))
-    : INITIAL_CROP;
+  const initialHeight = INITIAL_CROP;
 
-  const [cropW, setCropW] = useState(INITIAL_CROP);
-  const [cropH, setCropH] = useState(initialHeight);
+  // Reanimated shared values for width/height (improves performance by removing JS re-renders)
+  const cropW = useSharedValue(INITIAL_CROP);
+  const cropH = useSharedValue(initialHeight);
 
   // Crop area offset from center
   const offsetX = useSharedValue(0);
   const offsetY = useSharedValue(0);
   const offsetXStart = useSharedValue(0);
   const offsetYStart = useSharedValue(0);
-  const [cropPos, setCropPos] = useState({ x: 0, y: 0 });
 
   const cropAnimatedStyle = useAnimatedStyle(() => ({
+    width: cropW.value,
+    height: cropH.value,
     transform: [
-      { translateX: (imgDisplayW - cropW) / 2 + offsetX.value },
-      { translateY: (imgDisplayH - cropH) / 2 + offsetY.value },
+      { translateX: (imgDisplayW - cropW.value) / 2 + offsetX.value },
+      { translateY: (imgDisplayH - cropH.value) / 2 + offsetY.value },
     ],
   }));
 
@@ -120,18 +119,6 @@ export function CropperScreen({
     loadImageDimensions();
   }, [loadImageDimensions]);
 
-  const handleCropResize = useCallback(
-    (newWidth: number, newHeight: number) => {
-      setCropW(newWidth);
-      setCropH(newHeight);
-    },
-    []
-  );
-
-  const syncCropPos = useCallback((x: number, y: number) => {
-    setCropPos({ x, y });
-  }, []);
-
   const panGesture = Gesture.Pan()
     .averageTouches(true)
     .onStart(() => {
@@ -139,16 +126,12 @@ export function CropperScreen({
       offsetYStart.value = offsetY.value;
     })
     .onUpdate((e: any) => {
-      const maxDx = (imgDisplayW - cropW) / 2;
-      const maxDy = (imgDisplayH - cropH) / 2;
+      'worklet';
+      const maxDx = (imgDisplayW - cropW.value) / 2;
+      const maxDy = (imgDisplayH - cropH.value) / 2;
 
-      const newX = clamp(offsetXStart.value + e.translationX, -maxDx, maxDx);
-      const newY = clamp(offsetYStart.value + e.translationY, -maxDy, maxDy);
-
-      offsetX.value = newX;
-      offsetY.value = newY;
-
-      runOnJS(syncCropPos)(newX, newY);
+      offsetX.value = clamp(offsetXStart.value + e.translationX, -maxDx, maxDx);
+      offsetY.value = clamp(offsetYStart.value + e.translationY, -maxDy, maxDy);
     })
     .minPointers(1);
 
@@ -160,17 +143,22 @@ export function CropperScreen({
       const scaleX = imageDimensions.width / imgDisplayW;
       const scaleY = imageDimensions.height / imgDisplayH;
 
+      const currentCropW = cropW.value;
+      const currentCropH = cropH.value;
+      const currentOffsetX = offsetX.value;
+      const currentOffsetY = offsetY.value;
+
       // Crop top-left in image display coordinates
-      const cropLeft = (imgDisplayW - cropW) / 2 + cropPos.x;
-      const cropTop = (imgDisplayH - cropH) / 2 + cropPos.y;
+      const cropLeft = (imgDisplayW - currentCropW) / 2 + currentOffsetX;
+      const cropTop = (imgDisplayH - currentCropH) / 2 + currentOffsetY;
 
       const cropX = Math.round(Math.max(0, cropLeft * scaleX));
       const cropY = Math.round(Math.max(0, cropTop * scaleY));
       const finalW = Math.round(
-        Math.min(imageDimensions.width - cropX, cropW * scaleX)
+        Math.min(imageDimensions.width - cropX, currentCropW * scaleX)
       );
       const finalH = Math.round(
-        Math.min(imageDimensions.height - cropY, cropH * scaleY)
+        Math.min(imageDimensions.height - cropY, currentCropH * scaleY)
       );
 
       const result = await applyCrop(
@@ -240,10 +228,6 @@ export function CropperScreen({
             <Animated.View
               style={[
                 styles.cropArea,
-                {
-                  width: cropW,
-                  height: cropH,
-                },
                 cropAnimatedStyle,
               ]}
             >
@@ -264,7 +248,6 @@ export function CropperScreen({
                 maxWidth={imgDisplayW}
                 maxHeight={imgDisplayH}
                 borderColor={s.handleColor || tintColor}
-                onCropResize={handleCropResize}
               />
             </Animated.View>
           </GestureDetector>
