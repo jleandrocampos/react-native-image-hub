@@ -453,80 +453,128 @@ export function CameraOverlay({
           <AspectRatioGuide ratio={aspectRatio} />
         )}
 
-        <View style={[styles.topGradient, { height: insets.top + 50 }]} />
+        <View style={[styles.topGradient, { height: insets.top + 50 }, options.topBarGradientStyle]} />
 
-        <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
-          <TouchableOpacity
-            onPress={onCancel}
-            style={styles.iconButton}
-            activeOpacity={0.7}
-          >
-            <CloseIcon size={22} color="white" />
-          </TouchableOpacity>
-
-          {(showFlash || options.showGrid === true) && (
-            <View style={styles.topCenterButtons}>
-              {showFlash && (
-                <TouchableOpacity
-                  onPress={cycleFlash}
-                  style={styles.iconButton}
-                  activeOpacity={0.7}
-                >
-                  <FlashIcon size={22} color="white" mode={flashMode} />
-                </TouchableOpacity>
-              )}
-
-              {options.showGrid === true && (
-                <TouchableOpacity
-                  onPress={() => setShowGrid((prev) => !prev)}
-                  style={[
-                    styles.iconButton,
-                    showGrid && styles.iconButtonActive,
-                  ]}
-                  activeOpacity={0.7}
-                >
-                  <GridIcon size={20} color="white" />
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
-
-          <View style={{ flex: 1 }} />
-
-          <TouchableOpacity
-            onPress={toggleCamera}
-            style={styles.iconButton}
-            activeOpacity={0.7}
-          >
-            <RotateIcon size={24} color="white" />
-          </TouchableOpacity>
-        </View>
-
-        <View style={[styles.bottomGradient, { height: 75 }]} />
-
-        <View style={[styles.bottomBar, { paddingBottom: insets.bottom }]} >
-          <View style={styles.bottomBarRow}>
-            {showAspectRatio && (
+        {/* Top bar */}
+        {options.renderTopBar ? (
+          options.renderTopBar({
+            onCancel,
+            toggleCamera,
+            flashMode,
+            cycleFlash,
+            showGrid,
+            setShowGrid,
+          })
+        ) : (
+          <View style={[styles.topBar, { paddingTop: insets.top + 8 }, options.topBarStyle]}>
+            {options.renderCloseButton ? (
+              options.renderCloseButton({ onPress: onCancel })
+            ) : (
               <TouchableOpacity
-                onPress={cycleAspectRatio}
-                style={styles.ratioButton}
+                onPress={onCancel}
+                style={[styles.iconButton, options.iconButtonStyle]}
                 activeOpacity={0.7}
               >
-                <RatioIcon size={20} color="white" ratio={aspectRatio} />
+                <CloseIcon size={22} color="white" />
               </TouchableOpacity>
             )}
 
-            <CaptureButton onPress={handleCapture} disabled={isCapturing} size={48} />
+            {(showFlash || options.showGrid === true) && (
+              <View style={[styles.topCenterButtons, options.topCenterButtonsStyle]}>
+                {showFlash && (
+                  options.renderFlashButton ? (
+                    options.renderFlashButton({ onPress: cycleFlash, flashMode })
+                  ) : (
+                    <TouchableOpacity
+                      onPress={cycleFlash}
+                      style={[styles.iconButton, options.iconButtonStyle]}
+                      activeOpacity={0.7}
+                    >
+                      <FlashIcon size={22} color="white" mode={flashMode} />
+                    </TouchableOpacity>
+                  )
+                )}
 
-            {showZoom && (
-              <View style={styles.zoomIndicator}>
-                <Text style={styles.zoomText}>
-                  {zoom >= 10 ? `${Math.round(zoom)}x` : `${zoom.toFixed(1)}x`}
-                </Text>
+                {options.showGrid === true && (
+                  options.renderGridButton ? (
+                    options.renderGridButton({ onPress: () => setShowGrid((prev) => !prev), showGrid })
+                  ) : (
+                    <TouchableOpacity
+                      onPress={() => setShowGrid((prev) => !prev)}
+                      style={[
+                        styles.iconButton,
+                        options.iconButtonStyle,
+                        showGrid && styles.iconButtonActive,
+                      ]}
+                      activeOpacity={0.7}
+                    >
+                      <GridIcon size={20} color="white" />
+                    </TouchableOpacity>
+                  )
+                )}
               </View>
             )}
+
+            <View style={{ flex: 1 }} />
+
+            {options.renderRotateButton ? (
+              options.renderRotateButton({ onPress: toggleCamera })
+            ) : (
+              <TouchableOpacity
+                onPress={toggleCamera}
+                style={[styles.iconButton, options.iconButtonStyle]}
+                activeOpacity={0.7}
+              >
+                <RotateIcon size={24} color="white" />
+              </TouchableOpacity>
+            )}
           </View>
-        </View>
+        )}
+
+        <View style={[styles.bottomGradient, { height: 75 }, options.bottomGradientStyle]} />
+
+        {/* Bottom bar */}
+        {options.renderBottomBar ? (
+          options.renderBottomBar({
+            handleCapture,
+            isCapturing,
+            aspectRatio,
+            cycleAspectRatio,
+            zoom,
+          })
+        ) : (
+          <View style={[styles.bottomBar, { paddingBottom: insets.bottom }, options.bottomBarStyle]} >
+            <View style={[styles.bottomBarRow, options.bottomBarRowStyle]}>
+              {showAspectRatio && (
+                options.renderRatioButton ? (
+                  options.renderRatioButton({ onPress: cycleAspectRatio, aspectRatio })
+                ) : (
+                  <TouchableOpacity
+                    onPress={cycleAspectRatio}
+                    style={[styles.ratioButton, options.ratioButtonStyle]}
+                    activeOpacity={0.7}
+                  >
+                    <RatioIcon size={20} color="white" ratio={aspectRatio} />
+                  </TouchableOpacity>
+                )
+              )}
+
+              {options.renderCaptureButton ? (
+                options.renderCaptureButton({ onPress: handleCapture, disabled: isCapturing })
+              ) : (
+                <CaptureButton onPress={handleCapture} disabled={isCapturing} size={48} />
+              )}
+
+              {showZoom && (
+                <View style={[styles.zoomIndicator, options.zoomIndicatorStyle]}>
+                  <Text style={[styles.zoomText, options.zoomTextStyle]}>
+                    {zoom >= 10 ? `${Math.round(zoom)}x` : `${zoom.toFixed(1)}x`}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
 
         {renderOverlays()}
 

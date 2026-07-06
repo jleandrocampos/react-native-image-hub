@@ -1,3 +1,6 @@
+import type { ReactNode } from 'react';
+import type { StyleProp, ViewStyle, TextStyle } from 'react-native';
+
 /**
  * Base options shared across all image operations.
  */
@@ -54,6 +57,55 @@ export interface CameraOptions extends BaseOptions {
   mergeOverlay?: boolean;
   /** Show confirmation modal before returning merged image (default: true) */
   showConfirmModal?: boolean;
+  /** Style for the top bar container */
+  topBarStyle?: StyleProp<ViewStyle>;
+  /** Style for the bottom bar container */
+  bottomBarStyle?: StyleProp<ViewStyle>;
+  /** Style for the top gradient overlay */
+  topBarGradientStyle?: StyleProp<ViewStyle>;
+  /** Style for the bottom gradient overlay */
+  bottomGradientStyle?: StyleProp<ViewStyle>;
+  /** Style for the top center buttons container */
+  topCenterButtonsStyle?: StyleProp<ViewStyle>;
+  /** Style for the bottom bar row container */
+  bottomBarRowStyle?: StyleProp<ViewStyle>;
+  /** Base style for the small icon buttons (close, rotate, flash, grid) */
+  iconButtonStyle?: StyleProp<ViewStyle>;
+  /** Style for the aspect ratio button */
+  ratioButtonStyle?: StyleProp<ViewStyle>;
+  /** Style for the zoom indicator container */
+  zoomIndicatorStyle?: StyleProp<ViewStyle>;
+  /** Style for the zoom indicator text */
+  zoomTextStyle?: StyleProp<TextStyle>;
+  /** Custom render function for the close button */
+  renderCloseButton?: (props: { onPress: () => void }) => ReactNode;
+  /** Custom render function for the rotate button */
+  renderRotateButton?: (props: { onPress: () => void }) => ReactNode;
+  /** Custom render function for the flash toggle button */
+  renderFlashButton?: (props: { onPress: () => void; flashMode: 'on' | 'off' }) => ReactNode;
+  /** Custom render function for the grid toggle button */
+  renderGridButton?: (props: { onPress: () => void; showGrid: boolean }) => ReactNode;
+  /** Custom render function for the aspect ratio button */
+  renderRatioButton?: (props: { onPress: () => void; aspectRatio: '4:3' | '16:9' | '1:1' }) => ReactNode;
+  /** Custom render function for the capture button */
+  renderCaptureButton?: (props: { onPress: () => void; disabled: boolean }) => ReactNode;
+  /** Custom render function for the entire top bar */
+  renderTopBar?: (props: {
+    onCancel: () => void;
+    toggleCamera: () => void;
+    flashMode: 'on' | 'off';
+    cycleFlash: () => void;
+    showGrid: boolean;
+    setShowGrid: React.Dispatch<React.SetStateAction<boolean>>;
+  }) => ReactNode;
+  /** Custom render function for the entire bottom bar */
+  renderBottomBar?: (props: {
+    handleCapture: () => void;
+    isCapturing: boolean;
+    aspectRatio: '4:3' | '16:9' | '1:1';
+    cycleAspectRatio: () => void;
+    zoom: number;
+  }) => ReactNode;
 }
 
 /**
