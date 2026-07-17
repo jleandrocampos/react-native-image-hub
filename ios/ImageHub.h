@@ -1,3 +1,4 @@
+#import <PhotosUI/PhotosUI.h>
 #import <React/RCTBridgeModule.h>
 #import <UIKit/UIKit.h>
 

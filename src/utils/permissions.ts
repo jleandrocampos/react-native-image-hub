@@ -6,14 +6,14 @@ import { Platform, PermissionsAndroid, Alert, Linking } from 'react-native';
  */
 export async function requestCameraPermission(): Promise<boolean> {
   if (Platform.OS === 'ios') {
-    const { Camera } = require('react-native-vision-camera');
-    const status = await Camera.getCameraPermissionStatus();
-    if (status === 'authorized' || status === 'limited') {
+    const { VisionCamera } = require('react-native-vision-camera');
+    const status = VisionCamera.cameraPermissionStatus;
+    if (status === 'authorized') {
       return true;
     }
     if (status === 'not-determined') {
-      const result = await Camera.requestCameraPermission();
-      return result === 'authorized' || result === 'limited';
+      const granted = await VisionCamera.requestCameraPermission();
+      return granted === true;
     }
     // denied or restricted
     showPermissionAlert(

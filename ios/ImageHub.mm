@@ -86,7 +86,7 @@ RCT_EXPORT_METHOD(openGallery:(NSDictionary *)options
                         arc4random_uniform(10000)];
   NSString *filePath = [cacheDir stringByAppendingPathComponent:fileName];
 
-  NSData *jpegData = UIImageJPEGRepresentation(image, 0.9);
+   NSData *jpegData = UIImageJPEGRepresentation([self normalizedImage:image], 0.9);
   [jpegData writeToFile:filePath atomically:YES];
 
   return [NSString stringWithFormat:@"file://%@", filePath];
@@ -96,6 +96,17 @@ RCT_EXPORT_METHOD(openGallery:(NSDictionary *)options
   if ([uri hasSuffix:@".png"]) return @"image/png";
   if ([uri hasSuffix:@".webp"]) return @"image/webp";
   return @"image/jpeg";
+}
+
+- (UIImage *)normalizedImage:(UIImage *)image {
+  if (image.imageOrientation == UIImageOrientationUp) {
+    return image;
+  }
+  UIGraphicsBeginImageContextWithOptions(image.size, NO, image.scale);
+  [image drawInRect:CGRectMake(0, 0, image.size.width, image.size.height)];
+  UIImage *normalized = UIGraphicsGetImageFromCurrentImageContext();
+  UIGraphicsEndImageContext();
+  return normalized ?: image;
 }
 
 - (NSString *)resolvePathFromUri:(NSString *)uriString {
@@ -126,12 +137,16 @@ RCT_EXPORT_METHOD(getImageInfo:(NSString *)uri
     return;
   }
 
+  image = [self normalizedImage:image];
+
   CGSize size = image.size;
+  NSDictionary *attrs = [[NSFileManager defaultManager] attributesOfItemAtPath:path error:nil];
+  NSNumber *sizeNum = attrs ? attrs[NSFileSize] : nil;
   NSDictionary *info = @{
     @"width": @(size.width),
     @"height": @(size.height),
     @"mime": [self getMimeTypeForImage:uri] ?: @"image/jpeg",
-    @"size": @([[NSFileManager defaultManager] attributesOfItemAtPath:path error:nil][NSFileSize] doubleValue)
+    @"size": sizeNum ? @([sizeNum doubleValue]) : @(0)
   };
   resolve(info);
 }
@@ -148,6 +163,8 @@ RCT_EXPORT_METHOD(compressImage:(NSString *)inputUri
     reject(@"FILE_NOT_FOUND", @"File not found", nil);
     return;
   }
+
+  image = [self normalizedImage:image];
 
   CGFloat quality = [options[@"quality"] floatValue];
   NSNumber *targetWidth = options[@"width"];
@@ -225,6 +242,8 @@ RCT_EXPORT_METHOD(cropImage:(NSString *)uri
     return;
   }
 
+  image = [self normalizedImage:image];
+
   CGImageRef imageRef = CGImageCreateWithImageInRect(
     image.CGImage,
     CGRectMake(offsetX, offsetY, cropWidth, cropHeight)
@@ -262,7 +281,9 @@ RCT_EXPORT_METHOD(cropImage:(NSString *)uri
   [imageData writeToFile:filePath atomically:YES];
 
   NSString *fileUri = [NSString stringWithFormat:@"file://%@", filePath];
-  unsigned long fileSize = [[NSFileManager defaultManager] attributesOfItemAtPath:filePath error:nil][NSFileSize] unsignedLongValue;
+  NSDictionary *cropAttrs = [[NSFileManager defaultManager] attributesOfItemAtPath:filePath error:nil];
+  NSNumber *cropSizeNum = cropAttrs ? cropAttrs[NSFileSize] : nil;
+  unsigned long fileSize = cropSizeNum ? [cropSizeNum unsignedLongValue] : 0;
 
   NSMutableDictionary *result = [NSMutableDictionary dictionary];
   result[@"uri"] = fileUri;

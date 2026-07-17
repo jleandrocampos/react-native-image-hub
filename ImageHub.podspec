@@ -2,6 +2,10 @@ require "json"
 
 package = JSON.parse(File.read(File.join(__dir__, "package.json")))
 
+def min_ios_version_supported
+  '13.4'
+end
+
 Pod::Spec.new do |s|
   s.name         = "ImageHub"
   s.version      = package["version"]
@@ -15,6 +19,7 @@ Pod::Spec.new do |s|
 
   s.source_files = "ios/**/*.{h,m,mm,swift,cpp}"
   s.private_header_files = "ios/**/*.h"
+  s.frameworks = ["PhotosUI", "MobileCoreServices", "UIKit"]
 
   install_modules_dependencies(s)
 end
