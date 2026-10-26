@@ -35,6 +35,13 @@ function sortOverlays(items: CameraOverlayItem[]): CameraOverlayItem[] {
   return [...items].sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
 }
 
+function resolveHref(source: CameraOverlayItem['source']): string | number {
+  if (typeof source === 'object' && source != null) {
+    return (source as { uri?: string }).uri ?? '';
+  }
+  return source as string | number;
+}
+
 /**
  * Renders base photo + overlays in SVG and captures as a single image.
  * Exposes capture() via ref — only captures when parent calls it.
@@ -45,27 +52,36 @@ export const MergePreview = forwardRef<MergePreviewHandle, MergePreviewProps>(
     ref
   ) {
     const svgRef = useRef<Svg>(null);
+    const capturingRef = useRef(false);
 
     const screenW = Dimensions.get('window').width;
     const width = propWidth ?? Math.min(Math.floor(screenW - 32), 388);
-    const height = propHeight ?? Math.floor(width * 1.2);
+    const height = propHeight ?? Math.floor(width * (4 / 3));
 
     const sortedOverlays = sortOverlays(overlays);
 
     const capture = useCallback(() => {
-      if (!svgRef.current) return;
+      if (!svgRef.current || capturingRef.current) return;
+      capturingRef.current = true;
 
-      try {
-        const svg = svgRef.current as any;
-        if (!svg.toDataURL) return;
+      // Wait one frame so SVG finishes laying out before rasterizing
+      setTimeout(() => {
+        try {
+          const svg = svgRef.current as any;
+          if (!svg?.toDataURL) {
+            capturingRef.current = false;
+            return;
+          }
 
-        svg.toDataURL((data: string) => {
-          if (!data) return;
-          onMerged(data);
-        });
-      } catch {
-        // Silently fail
-      }
+          svg.toDataURL((data: string) => {
+            capturingRef.current = false;
+            if (!data) return;
+            onMerged(data);
+          });
+        } catch {
+          capturingRef.current = false;
+        }
+      }, 80);
     }, [onMerged]);
 
     useImperativeHandle(
@@ -76,8 +92,9 @@ export const MergePreview = forwardRef<MergePreviewHandle, MergePreviewProps>(
       [capture]
     );
 
+    // Default slice matches camera resizeMode="cover" + full-bleed masks
     const getPreserveAspectRatio = (item: CameraOverlayItem): string => {
-      return item.preserveAspectRatio ?? 'xMidYMid meet';
+      return item.preserveAspectRatio ?? 'xMidYMid slice';
     };
 
     return (
@@ -143,11 +160,12 @@ export const MergePreview = forwardRef<MergePreviewHandle, MergePreviewProps>(
             }
 
             const opacity = overlay.opacity ?? 1;
+            const href = resolveHref(overlay.source);
 
             return (
               <SvgImage
                 key={`overlay-${index}`}
-                href={overlay.source}
+                href={href as any}
                 x={x}
                 y={y}
                 width={w}

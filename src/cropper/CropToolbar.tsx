@@ -3,8 +3,8 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface CropToolbarProps {
   /** Title text */
@@ -13,6 +13,10 @@ interface CropToolbarProps {
   confirmText?: string;
   /** Cancel button text */
   cancelText?: string;
+  /** Skip (use without crop) button text */
+  skipText?: string;
+  /** Show skip button */
+  showSkip?: boolean;
   /** Tint color for confirm button */
   tintColor?: string;
   /** Widget color for cancel button */
@@ -33,15 +37,20 @@ interface CropToolbarProps {
   onConfirm: () => void;
   /** Called when cancel is pressed */
   onCancel: () => void;
+  /** Called when skip is pressed */
+  onSkip?: () => void;
 }
 
 /**
- * Toolbar for the crop screen with confirm/cancel buttons.
+ * Toolbar for the crop screen with confirm/cancel[/skip] buttons.
+ * Uses safe-area insets so the title clears notch / Dynamic Island on iOS.
  */
 export function CropToolbar({
   title = 'Redimensionar Foto',
   confirmText = 'Confirmar',
   cancelText = 'Cancelar',
+  skipText = 'Usar original',
+  showSkip = false,
   tintColor = '#5f8dd3',
   widgetColor = '#5f8dd3',
   backgroundColor = 'white',
@@ -52,8 +61,11 @@ export function CropToolbar({
   cancelSize = 16,
   onConfirm,
   onCancel,
+  onSkip,
 }: CropToolbarProps) {
-  const topPadding = Platform.OS === 'ios' ? 44 : 24;
+  const insets = useSafeAreaInsets();
+  // Extra gap below the status bar / Dynamic Island so the title is not flush.
+  const topPadding = Math.max(insets.top, 12) + 8;
 
   return (
     <View
@@ -87,6 +99,21 @@ export function CropToolbar({
           </Text>
         </TouchableOpacity>
 
+        {showSkip && onSkip ? (
+          <TouchableOpacity onPress={onSkip} style={styles.button}>
+            <Text
+              style={[
+                styles.buttonText,
+                { color: widgetColor, fontSize: cancelSize },
+              ]}
+            >
+              {skipText}
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.button} />
+        )}
+
         <TouchableOpacity onPress={onConfirm} style={styles.button}>
           <Text
             style={[
@@ -115,11 +142,14 @@ const styles = StyleSheet.create({
   buttonRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    alignItems: 'center',
+    paddingHorizontal: 8,
   },
   button: {
     paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
+    minWidth: 72,
+    alignItems: 'center',
   },
   buttonText: {},
 });

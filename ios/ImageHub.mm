@@ -146,7 +146,8 @@ RCT_EXPORT_METHOD(getImageInfo:(NSString *)uri
     @"width": @(size.width),
     @"height": @(size.height),
     @"mime": [self getMimeTypeForImage:uri] ?: @"image/jpeg",
-    @"size": sizeNum ? @([sizeNum doubleValue]) : @(0)
+    @"size": sizeNum ? @([sizeNum doubleValue]) : @(0),
+    @"path": [NSString stringWithFormat:@"file://%@", path]
   };
   resolve(info);
 }

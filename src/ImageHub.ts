@@ -1,11 +1,12 @@
 import { cameraManager } from './CameraManager';
+import { cropperManager } from './CropperManager';
 import {
   requestCameraPermission,
   requestGalleryPermission,
 } from './utils/permissions';
 import { processImage } from './utils/imageProcessing';
 import { openGalleryNative } from './gallery/GalleryBridge';
-import { applyCrop, getImageDimensions } from './cropper/cropUtils';
+import { ensureLocalImageUri } from './cropper/cropUtils';
 import type {
   BaseOptions,
   CameraOptions,
@@ -87,26 +88,19 @@ export class ImageHub {
       } as ImageHubError;
     }
 
-    const results = await Promise.all(
-      assets.map((asset: { uri: string }) =>
-        processImage(asset.uri, {
-          width: options.width,
-          height: options.height,
-          compressImageQuality: options.compressImageQuality,
-          includeBase64: options.includeBase64,
-          cropping: options.cropping,
-        })
-      )
-    );
+    const results: ImageResult[] = [];
+    for (const asset of assets) {
+      results.push(await this.processPickerAsset(asset.uri, options));
+    }
 
     return options.multiple ? results : results[0]!;
   }
 
   /**
-   * Open the cropper with an existing image.
+   * Open the cropper UI with an existing image.
    *
    * @param options - Cropper configuration with image path
-   * @returns Promise resolving to the cropped image
+   * @returns Promise resolving to the cropped (or skipped) image
    */
   static async openCropper(options: CropperOptions): Promise<ImageResult> {
     if (!options.path) {
@@ -116,25 +110,37 @@ export class ImageHub {
       } as ImageHubError;
     }
 
-    // Get image dimensions
-    const dims = await getImageDimensions(options.path);
+    const skipCropOnError = options.skipCropOnError !== false;
 
-    // Apply crop with full image as the crop area
-    return applyCrop(
-      options.path,
-      {
-        x: 0,
-        y: 0,
-        width: dims.width,
-        height: dims.height,
-      },
-      {
-        width: options.width,
-        height: options.height,
-        compressImageQuality: options.compressImageQuality,
-        includeBase64: options.includeBase64,
+    try {
+      // Prefer a stable local file:// path before opening the UI (Xiaomi content://).
+      const localPath = await ensureLocalImageUri(options.path);
+      return await cropperManager.openCropper({
+        allowSkipCrop: options.allowSkipCrop !== false,
+        skipCropOnError,
+        ...options,
+        path: localPath,
+      });
+    } catch (error: any) {
+      if (error?.code === 'cancelled') {
+        throw error;
       }
-    );
+      if (skipCropOnError) {
+        cropperManager.emit({
+          type: 'skip',
+          path: options.path,
+          code: error?.code,
+          message: error?.message || 'Cropper falhou, usando imagem original',
+        });
+        return processImage(options.path, {
+          width: options.width,
+          height: options.height,
+          compressImageQuality: options.compressImageQuality,
+          includeBase64: options.includeBase64,
+        });
+      }
+      throw error;
+    }
   }
 
   /**
@@ -175,5 +181,60 @@ export class ImageHub {
       ...options,
       mergeOverlay: options.mergeOverlay ?? true,
     };
+  }
+
+  /**
+   * Subscribe to cropper lifecycle events globally.
+   */
+  static addCropperListener(
+    listener: Parameters<typeof cropperManager.addEventListener>[0]
+  ): () => void {
+    return cropperManager.addEventListener(listener);
+  }
+
+  private static async processPickerAsset(
+    uri: string,
+    options: PickerOptions
+  ): Promise<ImageResult> {
+    const cropping = options.cropping === true;
+    const skipCropOnError = options.skipCropOnError !== false;
+
+    if (!cropping) {
+      return processImage(uri, {
+        width: options.width,
+        height: options.height,
+        compressImageQuality: options.compressImageQuality,
+        includeBase64: options.includeBase64,
+      });
+    }
+
+    try {
+      const localPath = await ensureLocalImageUri(uri);
+      return await cropperManager.openCropper({
+        ...options,
+        path: localPath,
+        allowSkipCrop: options.allowSkipCrop !== false,
+        skipCropOnError,
+      });
+    } catch (error: any) {
+      if (error?.code === 'cancelled') {
+        throw error;
+      }
+      if (skipCropOnError) {
+        cropperManager.emit({
+          type: 'skip',
+          path: uri,
+          code: error?.code,
+          message: error?.message || 'Cropper falhou, usando imagem original',
+        });
+        return processImage(uri, {
+          width: options.width,
+          height: options.height,
+          compressImageQuality: options.compressImageQuality,
+          includeBase64: options.includeBase64,
+        });
+      }
+      throw error;
+    }
   }
 }

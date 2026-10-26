@@ -1,6 +1,10 @@
+import { useMemo, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+} from 'react-native-reanimated';
 import type { SharedValue } from 'react-native-reanimated';
 
 interface CropHandlesProps {
@@ -11,6 +15,8 @@ interface CropHandlesProps {
   maxWidth?: number;
   maxHeight?: number;
   borderColor?: string;
+  /** When false, handle pans are disabled (e.g. while dismissing). */
+  enabled?: boolean;
 }
 
 interface HandleProps {
@@ -22,6 +28,7 @@ interface HandleProps {
   minHeight: number;
   maxWidth?: number;
   maxHeight?: number;
+  enabled: boolean;
 }
 
 function Handle({
@@ -32,54 +39,70 @@ function Handle({
   minHeight,
   maxWidth,
   maxHeight,
+  enabled,
 }: HandleProps) {
   const lastX = useSharedValue(0);
   const lastY = useSharedValue(0);
+  const maxWidthSV = useSharedValue(maxWidth ?? Number.POSITIVE_INFINITY);
+  const maxHeightSV = useSharedValue(maxHeight ?? Number.POSITIVE_INFINITY);
 
-  const gesture = Gesture.Pan()
-    .onStart(() => {
-      lastX.value = 0;
-      lastY.value = 0;
-    })
-    .onUpdate((e: any) => {
-      'worklet';
-      const dx = e.translationX - lastX.value;
-      const dy = e.translationY - lastY.value;
+  useEffect(() => {
+    maxWidthSV.value = maxWidth ?? Number.POSITIVE_INFINITY;
+    maxHeightSV.value = maxHeight ?? Number.POSITIVE_INFINITY;
+  }, [maxWidth, maxHeight, maxWidthSV, maxHeightSV]);
 
-      lastX.value = e.translationX;
-      lastY.value = e.translationY;
+  const gesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .enabled(enabled)
+        .onStart(() => {
+          'worklet';
+          lastX.value = 0;
+          lastY.value = 0;
+        })
+        .onUpdate((e) => {
+          'worklet';
+          const dx = e.translationX - lastX.value;
+          const dy = e.translationY - lastY.value;
 
-      let newWidth = cropWidth.value;
-      let newHeight = cropHeight.value;
+          lastX.value = e.translationX;
+          lastY.value = e.translationY;
 
-      switch (position) {
-        case 'bottomRight':
-          newWidth = Math.max(minWidth, cropWidth.value + 2 * dx);
-          newHeight = Math.max(minHeight, cropHeight.value + 2 * dy);
-          break;
-        case 'bottomLeft':
-          newWidth = Math.max(minWidth, cropWidth.value - 2 * dx);
-          newHeight = Math.max(minHeight, cropHeight.value + 2 * dy);
-          break;
-        case 'topRight':
-          newWidth = Math.max(minWidth, cropWidth.value + 2 * dx);
-          newHeight = Math.max(minHeight, cropHeight.value - 2 * dy);
-          break;
-        case 'topLeft':
-          newWidth = Math.max(minWidth, cropWidth.value - 2 * dx);
-          newHeight = Math.max(minHeight, cropHeight.value - 2 * dy);
-          break;
-      }
+          let newWidth = cropWidth.value;
+          let newHeight = cropHeight.value;
 
-      // Enforce square shape
-      let size = Math.max(newWidth, newHeight);
+          switch (position) {
+            case 'bottomRight':
+              newWidth = Math.max(minWidth, cropWidth.value + 2 * dx);
+              newHeight = Math.max(minHeight, cropHeight.value + 2 * dy);
+              break;
+            case 'bottomLeft':
+              newWidth = Math.max(minWidth, cropWidth.value - 2 * dx);
+              newHeight = Math.max(minHeight, cropHeight.value + 2 * dy);
+              break;
+            case 'topRight':
+              newWidth = Math.max(minWidth, cropWidth.value + 2 * dx);
+              newHeight = Math.max(minHeight, cropHeight.value - 2 * dy);
+              break;
+            case 'topLeft':
+              newWidth = Math.max(minWidth, cropWidth.value - 2 * dx);
+              newHeight = Math.max(minHeight, cropHeight.value - 2 * dy);
+              break;
+          }
 
-      if (maxWidth) size = Math.min(maxWidth, size);
-      if (maxHeight) size = Math.min(maxHeight, size);
+          // Enforce square shape
+          let size = Math.max(newWidth, newHeight);
 
-      cropWidth.value = size;
-      cropHeight.value = size;
-    });
+          size = Math.min(maxWidthSV.value, size);
+          size = Math.min(maxHeightSV.value, size);
+
+          cropWidth.value = size;
+          cropHeight.value = size;
+        }),
+    // Shared values + position/min sizes are stable for a given Handle instance.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [enabled, position, minWidth, minHeight]
+  );
 
   const handleSize = 40;
 
@@ -111,6 +134,7 @@ export function CropHandles({
   maxWidth,
   maxHeight,
   borderColor = 'white',
+  enabled = true,
 }: CropHandlesProps) {
   const containerStyle = useAnimatedStyle(() => ({
     width: cropWidth.value,
@@ -120,7 +144,7 @@ export function CropHandles({
   return (
     <Animated.View
       style={[styles.container, containerStyle]}
-      pointerEvents="box-none"
+      pointerEvents={enabled ? 'box-none' : 'none'}
     >
       <Handle
         position="topLeft"
@@ -131,6 +155,7 @@ export function CropHandles({
         minHeight={minHeight}
         maxWidth={maxWidth}
         maxHeight={maxHeight}
+        enabled={enabled}
       />
       <Handle
         position="topRight"
@@ -141,6 +166,7 @@ export function CropHandles({
         minHeight={minHeight}
         maxWidth={maxWidth}
         maxHeight={maxHeight}
+        enabled={enabled}
       />
       <Handle
         position="bottomLeft"
@@ -151,6 +177,7 @@ export function CropHandles({
         minHeight={minHeight}
         maxWidth={maxWidth}
         maxHeight={maxHeight}
+        enabled={enabled}
       />
       <Handle
         position="bottomRight"
@@ -161,6 +188,7 @@ export function CropHandles({
         minHeight={minHeight}
         maxWidth={maxWidth}
         maxHeight={maxHeight}
+        enabled={enabled}
       />
     </Animated.View>
   );

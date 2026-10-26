@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -11,8 +11,10 @@ import {
   Camera,
   useCameraDevice,
   usePhotoOutput,
+  type CameraRef,
 } from 'react-native-vision-camera';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { useSharedValue, runOnJS } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CaptureButton } from './CaptureButton';
 import { CameraOverlay } from './CameraOverlay';
@@ -64,9 +66,15 @@ export function CameraScreen({
     options.aspectRatio ?? '4:3'
   );
   const [showZoom] = useState(options.showZoom === true);
-  const [zoom, setZoom] = useState(options.zoom ?? 1);
+  const initialZoom = options.zoom ?? 1;
+  // Camera prop must be a number — SharedValue requires react-native-vision-camera-worklets.
+  const [zoom, setZoom] = useState(initialZoom);
+  const zoomSv = useSharedValue(initialZoom);
+  const baseZoomSv = useSharedValue(initialZoom);
+  const cameraRef = useRef<CameraRef>(null);
   const isProcessingRef = useRef(false);
-  const baseZoomRef = useRef(1);
+  const pendingZoomRef = useRef<number | null>(null);
+  const zoomTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const device = useCameraDevice(cameraPosition);
   const photoOutput = usePhotoOutput({
@@ -75,11 +83,94 @@ export function CameraScreen({
     containerFormat: 'jpeg',
   });
 
+  const minZoom = device?.minZoom ?? 1;
+  const maxZoom = device?.maxZoom ?? 10;
+
+  // Apply zoom via controller (catches inactive-camera cancellations) + state for UI.
+  // Do not pass SharedValue to <Camera zoom> — that needs vision-camera-worklets.
+  const pushZoom = useCallback((value: number) => {
+    setZoom(value);
+    const controller = cameraRef.current?.controller;
+    if (controller == null) return;
+    void Promise.resolve(controller.setZoom(value)).catch(() => undefined);
+  }, []);
+
+  // Throttle JS zoom updates so pinch stays on the UI thread (SharedValue)
+  // without setState-every-frame (Reanimated crash) or SharedValue-as-prop (worklets).
+  const scheduleZoom = useCallback(
+    (value: number) => {
+      pendingZoomRef.current = value;
+      if (zoomTimerRef.current != null) return;
+      zoomTimerRef.current = setTimeout(() => {
+        zoomTimerRef.current = null;
+        if (pendingZoomRef.current != null) {
+          pushZoom(pendingZoomRef.current);
+        }
+      }, 48);
+    },
+    [pushZoom]
+  );
+
+  const flushZoom = useCallback(
+    (value: number) => {
+      pendingZoomRef.current = value;
+      if (zoomTimerRef.current != null) {
+        clearTimeout(zoomTimerRef.current);
+        zoomTimerRef.current = null;
+      }
+      pushZoom(value);
+    },
+    [pushZoom]
+  );
+
   useEffect(() => {
     requestCameraPermission().then((granted) => {
       setHasPermission(granted);
     });
   }, []);
+
+  useEffect(() => {
+    zoomSv.value = 1;
+    baseZoomSv.value = 1;
+    setZoom(1);
+  }, [cameraPosition, zoomSv, baseZoomSv]);
+
+  useEffect(() => {
+    return () => {
+      if (zoomTimerRef.current != null) {
+        clearTimeout(zoomTimerRef.current);
+      }
+    };
+  }, []);
+
+  const handlePreviewStarted = useCallback(() => {
+    const value = zoomSv.value;
+    setZoom(value);
+    const controller = cameraRef.current?.controller;
+    if (controller == null) return;
+    void Promise.resolve(controller.setZoom(value)).catch(() => undefined);
+  }, [zoomSv]);
+
+  // Must stay before any early return (Rules of Hooks).
+  const pinchGesture = useMemo(
+    () =>
+      Gesture.Pinch()
+        .onBegin(() => {
+          baseZoomSv.value = zoomSv.value;
+        })
+        .onUpdate((e) => {
+          const next = Math.min(
+            maxZoom,
+            Math.max(minZoom, baseZoomSv.value * e.scale)
+          );
+          zoomSv.value = next;
+          runOnJS(scheduleZoom)(next);
+        })
+        .onEnd(() => {
+          runOnJS(flushZoom)(zoomSv.value);
+        }),
+    [minZoom, maxZoom, scheduleZoom, flushZoom, zoomSv, baseZoomSv]
+  );
 
   if (options.overlays && options.overlays.length > 0) {
     return (
@@ -109,21 +200,6 @@ export function CameraScreen({
       return RATIO_CYCLE[(idx + 1) % RATIO_CYCLE.length]!;
     });
   };
-
-  const clampZoom = (value: number) => {
-    if (!device) return value;
-    const min = device.minZoom ?? 1;
-    const max = device.maxZoom ?? 10;
-    return Math.min(max, Math.max(min, value));
-  };
-
-  const pinchGesture = Gesture.Pinch()
-    .onBegin(() => {
-      baseZoomRef.current = zoom;
-    })
-    .onUpdate((e) => {
-      setZoom(clampZoom(baseZoomRef.current * e.scale));
-    });
 
   const handleCapture = async () => {
     if (!photoOutput || isProcessingRef.current) return;
@@ -181,10 +257,23 @@ export function CameraScreen({
         options={{
           ...options,
           path: capturedUri,
+          allowSkipCrop: options.allowSkipCrop !== false,
+          skipCropOnError: options.skipCropOnError !== false,
         }}
         onCrop={onCapture}
         onCancel={() => setCapturedUri(null)}
+        onSkip={onCapture}
         onError={(err) => {
+          if (options.skipCropOnError !== false) {
+            onCapture({
+              path: capturedUri,
+              width: 0,
+              height: 0,
+              mime: 'image/jpeg',
+              size: 0,
+            });
+            return;
+          }
           setCapturedUri(null);
           onError(err);
         }}
@@ -217,11 +306,13 @@ export function CameraScreen({
     <GestureDetector gesture={pinchGesture}>
       <View style={styles.container}>
         <Camera
+          ref={cameraRef}
           style={StyleSheet.absoluteFill}
           device={device}
           isActive={true}
           outputs={[photoOutput]}
           resizeMode="cover"
+          onPreviewStarted={handlePreviewStarted}
         />
 
         {/* Grid overlay */}
@@ -372,7 +463,9 @@ export function CameraScreen({
               {showZoom && (
                 <View style={[styles.zoomIndicator, options.zoomIndicatorStyle]}>
                   <Text style={[styles.zoomText, options.zoomTextStyle]}>
-                    {zoom >= 10 ? `${Math.round(zoom)}x` : `${zoom.toFixed(1)}x`}
+                    {zoom >= 10
+                      ? `${Math.round(zoom)}x`
+                      : `${zoom.toFixed(1)}x`}
                   </Text>
                 </View>
               )}

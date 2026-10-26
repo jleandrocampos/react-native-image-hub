@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Dimensions,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -16,11 +17,15 @@ import { CropOverlay } from './CropOverlay';
 import { CropHandles } from './CropHandles';
 import { CropToolbar } from './CropToolbar';
 import { applyCrop, getImageDimensions } from './cropUtils';
+import { processImage } from '../utils/imageProcessing';
+import { cropperManager } from '../CropperManager';
 import type { CropperOptions, CropperStyles, ImageResult } from '../types';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const INITIAL_CROP = SCREEN_WIDTH * 0.85;
 const MIN_CROP = 80;
+/** Delay before unmount callbacks so in-flight touch events can flush. */
+const DISMISS_FLUSH_MS = 64;
 
 interface CropperScreenProps {
   imageUri: string;
@@ -28,6 +33,8 @@ interface CropperScreenProps {
   onCrop: (result: ImageResult) => void;
   onCancel: () => void;
   onError: (error: { code: string; message: string }) => void;
+  /** Use image without interactive crop */
+  onSkip?: (result: ImageResult) => void;
 }
 
 const defaultStyles: CropperStyles = {
@@ -50,12 +57,25 @@ const defaultStyles: CropperStyles = {
   processingTextColor: '#333',
 };
 
+function getSizeAsync(
+  uri: string
+): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    Image.getSize(
+      uri,
+      (width, height) => resolve({ width, height }),
+      (error) => reject(error)
+    );
+  });
+}
+
 export function CropperScreen({
   imageUri,
   options,
   onCrop,
   onCancel,
   onError,
+  onSkip,
 }: CropperScreenProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [imageDimensions, setImageDimensions] = useState({
@@ -63,6 +83,11 @@ export function CropperScreen({
     height: 0,
   });
   const [isProcessing, setIsProcessing] = useState(false);
+  const [gesturesLocked, setGesturesLocked] = useState(false);
+  const dismissScheduledRef = useRef(false);
+
+  const allowSkipCrop = options.allowSkipCrop !== false;
+  const skipCropOnError = options.skipCropOnError !== false;
 
   const s = { ...defaultStyles, ...options.styles };
   const tintColor = options.cropperTintColor || s.borderColor || '#5f8dd3';
@@ -95,49 +120,211 @@ export function CropperScreen({
   const offsetXStart = useSharedValue(0);
   const offsetYStart = useSharedValue(0);
 
+  // Keep display size on the UI thread so the pan worklet stays stable across renders.
+  const imgDisplayWSV = useSharedValue(imgDisplayW);
+  const imgDisplayHSV = useSharedValue(imgDisplayH);
+
+  useEffect(() => {
+    imgDisplayWSV.value = imgDisplayW;
+    imgDisplayHSV.value = imgDisplayH;
+  }, [imgDisplayW, imgDisplayH, imgDisplayWSV, imgDisplayHSV]);
+
   const cropAnimatedStyle = useAnimatedStyle(() => ({
     width: cropW.value,
     height: cropH.value,
     transform: [
-      { translateX: (imgDisplayW - cropW.value) / 2 + offsetX.value },
-      { translateY: (imgDisplayH - cropH.value) / 2 + offsetY.value },
+      {
+        translateX:
+          (imgDisplayWSV.value - cropW.value) / 2 + offsetX.value,
+      },
+      {
+        translateY:
+          (imgDisplayHSV.value - cropH.value) / 2 + offsetY.value,
+      },
     ],
   }));
 
+  const buildUncroppedResult = useCallback(async (): Promise<ImageResult> => {
+    return processImage(imageUri, {
+      width: options.width,
+      height: options.height,
+      compressImageQuality: options.compressImageQuality,
+      includeBase64: options.includeBase64,
+    });
+  }, [
+    imageUri,
+    options.width,
+    options.height,
+    options.compressImageQuality,
+    options.includeBase64,
+  ]);
+
+  const dismissSafely = useCallback((action: () => void) => {
+    if (dismissScheduledRef.current) return;
+    dismissScheduledRef.current = true;
+    setGesturesLocked(true);
+    // Let the current touch frame finish before parent unmounts Reanimated nodes.
+    requestAnimationFrame(() => {
+      setTimeout(action, DISMISS_FLUSH_MS);
+    });
+  }, []);
+
+  const handleSkip = useCallback(async () => {
+    if (isProcessing || gesturesLocked || dismissScheduledRef.current) return;
+    setGesturesLocked(true);
+    setIsProcessing(true);
+    try {
+      const result = await buildUncroppedResult();
+      dismissSafely(() => {
+        if (onSkip) {
+          onSkip(result);
+        } else {
+          onCrop(result);
+        }
+      });
+    } catch (error: any) {
+      dismissScheduledRef.current = false;
+      setGesturesLocked(false);
+      onError({
+        code: 'unknown',
+        message: error?.message || 'Failed to process image without crop',
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [
+    buildUncroppedResult,
+    dismissSafely,
+    gesturesLocked,
+    isProcessing,
+    onCrop,
+    onError,
+    onSkip,
+  ]);
+
   const loadImageDimensions = useCallback(async () => {
     try {
-      const dims = await getImageDimensions(imageUri);
+      let dims: { width: number; height: number } | null = null;
+      try {
+        dims = await getImageDimensions(imageUri);
+      } catch (nativeError: any) {
+        cropperManager.emit({
+          type: 'error',
+          path: imageUri,
+          code: 'unknown',
+          message:
+            nativeError?.message ||
+            'Native getImageInfo failed, trying Image.getSize',
+        });
+        try {
+          dims = await getSizeAsync(imageUri);
+        } catch {
+          dims = null;
+        }
+      }
+
+      if (!dims || dims.width <= 0 || dims.height <= 0) {
+        cropperManager.emit({
+          type: 'error',
+          path: imageUri,
+          code: 'unknown',
+          message: 'Failed to load image dimensions',
+        });
+
+        if (skipCropOnError || allowSkipCrop) {
+          // Auto-continue without cropper UI when dimensions cannot be loaded.
+          try {
+            const result = await buildUncroppedResult();
+            dismissSafely(() => {
+              if (onSkip) {
+                onSkip(result);
+              } else {
+                onCrop(result);
+              }
+            });
+            return;
+          } catch (fallbackError: any) {
+            setIsLoading(false);
+            onError({
+              code: 'unknown',
+              message:
+                fallbackError?.message || 'Failed to load image dimensions',
+            });
+            return;
+          }
+        }
+
+        setIsLoading(false);
+        onError({ code: 'unknown', message: 'Failed to load image dimensions' });
+        return;
+      }
+
       setImageDimensions(dims);
-    } catch {
-      onError({ code: 'unknown', message: 'Failed to load image dimensions' });
-    } finally {
+      cropperManager.emit({ type: 'ready', path: imageUri });
       setIsLoading(false);
+    } catch (error: any) {
+      setIsLoading(false);
+      onError({
+        code: 'unknown',
+        message: error?.message || 'Failed to load image dimensions',
+      });
     }
-  }, [imageUri, onError]);
+  }, [
+    allowSkipCrop,
+    buildUncroppedResult,
+    dismissSafely,
+    imageUri,
+    onCrop,
+    onError,
+    onSkip,
+    skipCropOnError,
+  ]);
 
   useEffect(() => {
     loadImageDimensions();
   }, [loadImageDimensions]);
 
-  const panGesture = Gesture.Pan()
-    .averageTouches(true)
-    .onStart(() => {
-      offsetXStart.value = offsetX.value;
-      offsetYStart.value = offsetY.value;
-    })
-    .onUpdate((e: any) => {
-      'worklet';
-      const maxDx = (imgDisplayW - cropW.value) / 2;
-      const maxDy = (imgDisplayH - cropH.value) / 2;
+  const panGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .averageTouches(true)
+        .enabled(!gesturesLocked)
+        .onStart(() => {
+          'worklet';
+          offsetXStart.value = offsetX.value;
+          offsetYStart.value = offsetY.value;
+        })
+        .onUpdate((e) => {
+          'worklet';
+          const maxDx = (imgDisplayWSV.value - cropW.value) / 2;
+          const maxDy = (imgDisplayHSV.value - cropH.value) / 2;
 
-      offsetX.value = clamp(offsetXStart.value + e.translationX, -maxDx, maxDx);
-      offsetY.value = clamp(offsetYStart.value + e.translationY, -maxDy, maxDy);
-    })
-    .minPointers(1);
+          offsetX.value = clamp(
+            offsetXStart.value + e.translationX,
+            -maxDx,
+            maxDx
+          );
+          offsetY.value = clamp(
+            offsetYStart.value + e.translationY,
+            -maxDy,
+            maxDy
+          );
+        })
+        .minPointers(1),
+    // Shared values are stable; only lock toggles recreation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [gesturesLocked]
+  );
+
+  const handleCancel = useCallback(() => {
+    if (isProcessing) return;
+    dismissSafely(onCancel);
+  }, [dismissSafely, onCancel, isProcessing]);
 
   const handleConfirm = async () => {
-    if (isProcessing) return;
+    if (isProcessing || gesturesLocked || dismissScheduledRef.current) return;
 
+    setGesturesLocked(true);
     setIsProcessing(true);
     try {
       const scaleX = imageDimensions.width / imgDisplayW;
@@ -171,8 +358,33 @@ export function CropperScreen({
           includeBase64: options.includeBase64,
         }
       );
-      onCrop(result);
+      dismissSafely(() => onCrop(result));
     } catch (error: any) {
+      cropperManager.emit({
+        type: 'error',
+        path: imageUri,
+        code: 'crop_failed',
+        message: error.message || 'Failed to crop image',
+      });
+
+      if (skipCropOnError || allowSkipCrop) {
+        try {
+          const result = await buildUncroppedResult();
+          dismissSafely(() => {
+            if (onSkip) {
+              onSkip(result);
+            } else {
+              onCrop(result);
+            }
+          });
+          return;
+        } catch {
+          // fall through to onError
+        }
+      }
+
+      dismissScheduledRef.current = false;
+      setGesturesLocked(false);
       onError({
         code: 'crop_failed',
         message: error.message || 'Failed to crop image',
@@ -197,11 +409,16 @@ export function CropperScreen({
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: s.backgroundColor }]}>
+    <View
+      style={[styles.container, { backgroundColor: s.backgroundColor }]}
+      pointerEvents={gesturesLocked ? 'box-none' : 'auto'}
+    >
       <CropToolbar
         title={options.cropperToolbarTitle}
         confirmText={options.cropperChooseText}
         cancelText={options.cropperCancelText}
+        skipText={options.cropperSkipText || 'Usar original'}
+        showSkip={allowSkipCrop}
         tintColor={tintColor}
         widgetColor={widgetColor}
         backgroundColor={s.toolbarBackground}
@@ -211,10 +428,14 @@ export function CropperScreen({
         confirmSize={s.confirmSize}
         cancelSize={s.cancelSize}
         onConfirm={handleConfirm}
-        onCancel={onCancel}
+        onCancel={handleCancel}
+        onSkip={handleSkip}
       />
 
-      <View style={styles.imageContainer}>
+      <View
+        style={styles.imageContainer}
+        pointerEvents={gesturesLocked ? 'none' : 'auto'}
+      >
         {/* Static image */}
         <View style={{ width: imgDisplayW, height: imgDisplayH }}>
           <Animated.Image
@@ -225,12 +446,7 @@ export function CropperScreen({
 
           {/* Draggable crop area — positioned over the image */}
           <GestureDetector gesture={panGesture}>
-            <Animated.View
-              style={[
-                styles.cropArea,
-                cropAnimatedStyle,
-              ]}
-            >
+            <Animated.View style={[styles.cropArea, cropAnimatedStyle]}>
               <CropOverlay
                 cropWidth={cropW}
                 cropHeight={cropH}
@@ -248,6 +464,7 @@ export function CropperScreen({
                 maxWidth={imgDisplayW}
                 maxHeight={imgDisplayH}
                 borderColor={s.handleColor || tintColor}
+                enabled={!gesturesLocked}
               />
             </Animated.View>
           </GestureDetector>
@@ -260,6 +477,7 @@ export function CropperScreen({
             styles.processingOverlay,
             { backgroundColor: s.processingBackground },
           ]}
+          pointerEvents="none"
         >
           <View
             style={[

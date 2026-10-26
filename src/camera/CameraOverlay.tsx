@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -11,8 +11,10 @@ import {
   Camera,
   useCameraDevice,
   usePhotoOutput,
+  type CameraRef,
 } from 'react-native-vision-camera';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { useSharedValue, runOnJS } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CaptureButton } from './CaptureButton';
 import { MergePreview, type MergePreviewHandle } from './MergePreview';
@@ -89,6 +91,9 @@ export function CameraOverlay({
   );
   const [isCapturing, setIsCapturing] = useState(false);
   const [base64Photo, setBase64Photo] = useState<string>('');
+  const [mergeSize, setMergeSize] = useState<{ width: number; height: number } | null>(
+    null
+  );
   const [showConfirm, setShowConfirm] = useState(false);
   const [flashMode, setFlashMode] = useState<FlashMode>(
     options.flashMode ?? 'off'
@@ -100,9 +105,15 @@ export function CameraOverlay({
     options.aspectRatio ?? '4:3'
   );
   const [showZoom] = useState(options.showZoom === true);
-  const [zoom, setZoom] = useState(options.zoom ?? 1);
+  const initialZoom = options.zoom ?? 1;
+  // Camera prop must be a number — SharedValue requires react-native-vision-camera-worklets.
+  const [zoom, setZoom] = useState(initialZoom);
+  const zoomSv = useSharedValue(initialZoom);
+  const baseZoomSv = useSharedValue(initialZoom);
+  const cameraRef = useRef<CameraRef>(null);
   const isProcessingRef = useRef(false);
-  const baseZoomRef = useRef(1);
+  const pendingZoomRef = useRef<number | null>(null);
+  const zoomTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const device = useCameraDevice(cameraPosition);
   const photoOutput = usePhotoOutput({
@@ -111,15 +122,73 @@ export function CameraOverlay({
     containerFormat: 'jpeg',
   });
 
+  const minZoom = device?.minZoom ?? 1;
+  const maxZoom = device?.maxZoom ?? 10;
+
   const sortedOverlays = sortOverlays(options.overlays ?? []);
   const shouldMerge = options.mergeOverlay && sortedOverlays.length > 0;
   const shouldShowModal = options.showConfirmModal !== false;
+
+  const pushZoom = useCallback((value: number) => {
+    setZoom(value);
+    const controller = cameraRef.current?.controller;
+    if (controller == null) return;
+    void Promise.resolve(controller.setZoom(value)).catch(() => undefined);
+  }, []);
+
+  const scheduleZoom = useCallback(
+    (value: number) => {
+      pendingZoomRef.current = value;
+      if (zoomTimerRef.current != null) return;
+      zoomTimerRef.current = setTimeout(() => {
+        zoomTimerRef.current = null;
+        if (pendingZoomRef.current != null) {
+          pushZoom(pendingZoomRef.current);
+        }
+      }, 48);
+    },
+    [pushZoom]
+  );
+
+  const flushZoom = useCallback(
+    (value: number) => {
+      pendingZoomRef.current = value;
+      if (zoomTimerRef.current != null) {
+        clearTimeout(zoomTimerRef.current);
+        zoomTimerRef.current = null;
+      }
+      pushZoom(value);
+    },
+    [pushZoom]
+  );
 
   useEffect(() => {
     requestCameraPermission().then((granted) => {
       setHasPermission(granted);
     });
   }, []);
+
+  useEffect(() => {
+    zoomSv.value = 1;
+    baseZoomSv.value = 1;
+    setZoom(1);
+  }, [cameraPosition, zoomSv, baseZoomSv]);
+
+  useEffect(() => {
+    return () => {
+      if (zoomTimerRef.current != null) {
+        clearTimeout(zoomTimerRef.current);
+      }
+    };
+  }, []);
+
+  const handlePreviewStarted = useCallback(() => {
+    const value = zoomSv.value;
+    setZoom(value);
+    const controller = cameraRef.current?.controller;
+    if (controller == null) return;
+    void Promise.resolve(controller.setZoom(value)).catch(() => undefined);
+  }, [zoomSv]);
 
   const toggleCamera = () => {
     setCameraPosition((prev) => (prev === 'back' ? 'front' : 'back'));
@@ -139,20 +208,25 @@ export function CameraOverlay({
     });
   };
 
-  const clampZoom = (value: number) => {
-    if (!device) return value;
-    const min = device.minZoom ?? 1;
-    const max = device.maxZoom ?? 10;
-    return Math.min(max, Math.max(min, value));
-  };
-
-  const pinchGesture = Gesture.Pinch()
-    .onBegin(() => {
-      baseZoomRef.current = zoom;
-    })
-    .onUpdate((e) => {
-      setZoom(clampZoom(baseZoomRef.current * e.scale));
-    });
+  const pinchGesture = useMemo(
+    () =>
+      Gesture.Pinch()
+        .onBegin(() => {
+          baseZoomSv.value = zoomSv.value;
+        })
+        .onUpdate((e) => {
+          const next = Math.min(
+            maxZoom,
+            Math.max(minZoom, baseZoomSv.value * e.scale)
+          );
+          zoomSv.value = next;
+          runOnJS(scheduleZoom)(next);
+        })
+        .onEnd(() => {
+          runOnJS(flushZoom)(zoomSv.value);
+        }),
+    [minZoom, maxZoom, scheduleZoom, flushZoom, zoomSv, baseZoomSv]
+  );
 
   const finishCapture = async (uri: string) => {
     try {
@@ -199,9 +273,22 @@ export function CameraOverlay({
       }
 
       if (shouldMerge) {
-        const rawBase64 = await ImageHub.readBase64(uri);
-        const base64Uri = `data:image/jpeg;base64,${rawBase64}`;
+        // Downscale before SVG merge — full-res base64 in SVG/toDataURL OOMs on many devices
+        const processed = await processImage(uri, {
+          width: 1280,
+          height: 1280,
+          compressImageQuality: 0.75,
+          includeBase64: true,
+        });
+        const raw = processed.data || (await ImageHub.readBase64(processed.path));
+        const base64Uri = String(raw).startsWith('data:')
+          ? String(raw)
+          : `data:image/jpeg;base64,${raw}`;
         setBase64Photo(base64Uri);
+        setMergeSize({
+          width: processed.width || 0,
+          height: processed.height || 0,
+        });
 
         if (shouldShowModal) {
           setShowConfirm(true);
@@ -223,34 +310,80 @@ export function CameraOverlay({
   };
 
   const handleConfirmMerged = (mergedBase64Data: string) => {
+    const outW = mergeSize?.width ?? 0;
+    const outH = mergeSize?.height ?? 0;
     setShowConfirm(false);
     setBase64Photo('');
+    setMergeSize(null);
 
     if (!mergedBase64Data) {
       return;
     }
 
+    const raw = String(mergedBase64Data).replace(/^data:[^;]+;base64,/, '');
+    const dataUri = `data:image/jpeg;base64,${raw}`;
+
     onCapture({
-      path: mergedBase64Data,
-      width: 0,
-      height: 0,
+      path: dataUri,
+      width: outW,
+      height: outH,
       mime: 'image/jpeg',
       size: 0,
-      data: options.includeBase64 ? mergedBase64Data : undefined,
+      data: options.includeBase64 ? raw : undefined,
     });
   };
 
   const handleRefuseConfirm = () => {
     setShowConfirm(false);
     setBase64Photo('');
+    setMergeSize(null);
   };
+
+  const previewMergeSize = (() => {
+    const maxW = Math.min(Math.floor(SCREEN_WIDTH - 32), 388);
+    const photoW = mergeSize?.width ?? 0;
+    const photoH = mergeSize?.height ?? 0;
+    if (photoW > 0 && photoH > 0) {
+      const h = Math.round(maxW * (photoH / photoW));
+      const maxH = Math.floor(SCREEN_HEIGHT * 0.5);
+      return { width: maxW, height: Math.min(h, maxH) };
+    }
+    return { width: maxW, height: Math.floor(maxW * 4 / 3) };
+  })();
 
   const handleConfirmPress = () => {
     mergeRef.current?.capture();
   };
 
+  const isFullBleedOverlay = (overlay: CameraOverlayItem) => {
+    const w = overlay.width;
+    const h = overlay.height;
+    const fullW = w === undefined || w === '100%' || w === 100;
+    const fullH = h === undefined || h === '100%' || h === 100;
+    const topOk = overlay.top === undefined || overlay.top === 0;
+    const leftOk = overlay.left === undefined || overlay.left === 0;
+    return fullW && fullH && topOk && leftOk && !overlay.right && !overlay.bottom;
+  };
+
   const renderOverlays = () => {
     if (sortedOverlays.length === 0) return null;
+
+    // Full-bleed masks (e.g. fumaça preta) must match camera cover framing
+    if (sortedOverlays.every(isFullBleedOverlay)) {
+      return (
+        <View style={[StyleSheet.absoluteFill, { zIndex: 20 }]} pointerEvents="box-none">
+          {sortedOverlays.map((overlay, index) => (
+            <Image
+              key={`overlay-${index}`}
+              source={overlay.source}
+              style={[StyleSheet.absoluteFill, { opacity: overlay.opacity ?? 1 }]}
+              resizeMode="cover"
+              pointerEvents="none"
+            />
+          ))}
+        </View>
+      );
+    }
 
     const topOffset = insets.top + 50;
     const bottomOffset = 75;
@@ -321,7 +454,7 @@ export function CameraOverlay({
                 height: h,
                 opacity,
               }}
-              resizeMode="contain"
+              resizeMode="cover"
               pointerEvents="none"
             />
           );
@@ -384,6 +517,8 @@ export function CameraOverlay({
                 base64Photo={base64Photo}
                 overlays={sortedOverlays}
                 onMerged={handleConfirmMerged}
+                width={previewMergeSize.width}
+                height={previewMergeSize.height}
               />
             </View>
 
@@ -415,11 +550,13 @@ export function CameraOverlay({
     <GestureDetector gesture={pinchGesture}>
       <View style={styles.container}>
         <Camera
+          ref={cameraRef}
           style={StyleSheet.absoluteFill}
           device={device}
           isActive={true}
           outputs={[photoOutput]}
           resizeMode="cover"
+          onPreviewStarted={handlePreviewStarted}
         />
 
         {/* Grid overlay */}
@@ -568,7 +705,9 @@ export function CameraOverlay({
               {showZoom && (
                 <View style={[styles.zoomIndicator, options.zoomIndicatorStyle]}>
                   <Text style={[styles.zoomText, options.zoomTextStyle]}>
-                    {zoom >= 10 ? `${Math.round(zoom)}x` : `${zoom.toFixed(1)}x`}
+                    {zoom >= 10
+                      ? `${Math.round(zoom)}x`
+                      : `${zoom.toFixed(1)}x`}
                   </Text>
                 </View>
               )}
@@ -592,6 +731,8 @@ export function CameraOverlay({
               base64Photo={base64Photo}
               overlays={sortedOverlays}
               onMerged={handleConfirmMerged}
+              width={previewMergeSize.width}
+              height={previewMergeSize.height}
             />
           </View>
         )}

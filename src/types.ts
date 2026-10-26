@@ -2,6 +2,25 @@ import type { ReactNode } from 'react';
 import type { StyleProp, ViewStyle, TextStyle } from 'react-native';
 
 /**
+ * Cropper lifecycle event payload.
+ */
+export type CropperEventType =
+  | 'open'
+  | 'ready'
+  | 'confirm'
+  | 'cancel'
+  | 'skip'
+  | 'error'
+  | 'dismiss';
+
+export interface CropperEvent {
+  type: CropperEventType;
+  path?: string;
+  message?: string;
+  code?: string;
+}
+
+/**
  * Base options shared across all image operations.
  */
 export interface BaseOptions {
@@ -11,6 +30,15 @@ export interface BaseOptions {
   height?: number;
   /** Open cropper after selection/capture (default: false) */
   cropping?: boolean;
+  /**
+   * If cropper fails to open/load/process, return the original (processed)
+   * image instead of rejecting (default: true).
+   */
+  skipCropOnError?: boolean;
+  /**
+   * Show a "use without crop" action in the cropper toolbar (default: true).
+   */
+  allowSkipCrop?: boolean;
   /** Include base64 string in result (default: false) */
   includeBase64?: boolean;
   /** Image compression quality 0.0 - 1.0 (default: 0.8) */
@@ -27,6 +55,10 @@ export interface BaseOptions {
   cropperChooseText?: string;
   /** Cropper cancel button text */
   cropperCancelText?: string;
+  /** Cropper skip (use original) button text */
+  cropperSkipText?: string;
+  /** Lifecycle events from the cropper UI */
+  onCropperEvent?: (event: CropperEvent) => void;
 }
 
 /**

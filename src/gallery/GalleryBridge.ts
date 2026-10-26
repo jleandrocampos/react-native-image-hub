@@ -31,7 +31,8 @@ async function openIOSGallery(options: {
 }
 
 /**
- * Open Android gallery using ACTION_PICK (via native module).
+ * Open Android gallery using the system Photo Picker (API 33+)
+ * or ACTION_GET_CONTENT fallback — never createChooser (HyperOS Camera pitfall).
  */
 async function openAndroidGallery(options: {
   multiple: boolean;

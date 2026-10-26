@@ -48,71 +48,32 @@ export async function requestCameraPermission(): Promise<boolean> {
   return false;
 }
 
+function getAndroidApiLevel(): number {
+  return typeof Platform.Version === 'number'
+    ? Platform.Version
+    : parseInt(Platform.Version as string, 10);
+}
+
 /**
- * Request gallery/photos permission.
- * Returns true if granted, false otherwise.
+ * Whether gallery selection uses the system photo picker (Android 13+).
+ * On all Android versions the native module uses intents that do not need
+ * READ_EXTERNAL_STORAGE / READ_MEDIA_IMAGES (Photo Picker or ACTION_GET_CONTENT).
+ */
+export function usesSystemPhotoPicker(): boolean {
+  return Platform.OS === 'android' && getAndroidApiLevel() >= 33;
+}
+
+/**
+ * Gallery access for the native picker.
+ * Always allowed: iOS PHPicker and Android Photo Picker / ACTION_GET_CONTENT
+ * grant temporary URI access without broad storage permission.
+ *
+ * Do NOT request READ_EXTERNAL_STORAGE here — on API < 33 that blocked Samsung
+ * (and others) with NEVER_ASK_AGAIN even though GET_CONTENT works without it.
+ * Do NOT request READ_MEDIA_IMAGES (Play policy) or CAMERA (HyperOS chooser).
  */
 export async function requestGalleryPermission(): Promise<boolean> {
-  if (Platform.OS === 'ios') {
-    // iOS PHPicker doesn't require explicit permission
-    return true;
-  }
-
-  // Android
-  const androidVersion: number =
-    typeof Platform.Version === 'number'
-      ? Platform.Version
-      : parseInt(Platform.Version as string, 10);
-
-  if (androidVersion >= 33) {
-    // Android 13+ uses READ_MEDIA_IMAGES
-    const granted = await PermissionsAndroid.request(
-      'android.permission.READ_MEDIA_IMAGES' as any,
-      {
-        title: 'Permissao de Galeria',
-        message: 'O aplicativo precisa de permissao para acessar suas imagens.',
-        buttonPositive: 'OK',
-        buttonNegative: 'Cancelar',
-      }
-    );
-
-    if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-      return true;
-    }
-
-    if (granted === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) {
-      showPermissionAlert(
-        'Permissao de Galeria',
-        'Permissao de galeria negada permanentemente. Por favor, habilite nas configuracoes do dispositivo.'
-      );
-    }
-
-    return false;
-  }
-
-  // Android < 13 uses READ_EXTERNAL_STORAGE
-  const granted = await PermissionsAndroid.request(
-    PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
-    {
-      title: 'Permissao de Galeria',
-      message: 'O aplicativo precisa de permissao para acessar suas imagens.',
-      buttonPositive: 'OK',
-      buttonNegative: 'Cancelar',
-    }
-  );
-
-  if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-    return true;
-  }
-
-  if (granted === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) {
-    showPermissionAlert(
-      'Permissao de Galeria',
-      'Permissao de galeria negada permanentemente. Por favor, habilite nas configuracoes do dispositivo.'
-    );
-  }
-
-  return false;
+  return true;
 }
 
 /**

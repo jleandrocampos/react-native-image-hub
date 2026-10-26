@@ -11,7 +11,9 @@ export type { MergePreviewHandle } from './camera/MergePreview';
 export { CaptureButton } from './camera/CaptureButton';
 export { useCamera } from './camera/useCamera';
 export { ImagePickerProvider } from './ImagePickerProvider';
+export type { ImagePickerProviderProps } from './ImagePickerProvider';
 export { cameraManager } from './CameraManager';
+export { cropperManager } from './CropperManager';
 
 // Gallery exports
 export { useGallery } from './gallery/useGallery';
@@ -22,12 +24,13 @@ export { CropperScreen } from './cropper/CropperScreen';
 export { CropOverlay } from './cropper/CropOverlay';
 export { CropToolbar } from './cropper/CropToolbar';
 export { useCropGesture } from './cropper/useCropGesture';
-export { applyCrop } from './cropper/cropUtils';
+export { applyCrop, ensureLocalImageUri } from './cropper/cropUtils';
 
 // Utility exports
 export {
   requestCameraPermission,
   requestGalleryPermission,
+  usesSystemPhotoPicker,
 } from './utils/permissions';
 export { processImage, getImageDimensions } from './utils/imageProcessing';
 export {
@@ -49,6 +52,8 @@ export type {
   ImageHubError,
   GalleryAsset,
   CropData,
+  CropperEvent,
+  CropperEventType,
 } from './types';
 
 // Main export
@@ -59,6 +64,9 @@ export const ImagePicker = {
   openCamera: (options: CameraOptions) => ImageHub.openCamera(options),
   openPicker: (options: PickerOptions) => ImageHub.openPicker(options),
   openCropper: (options: CropperOptions) => ImageHub.openCropper(options),
+  addCropperListener: (
+    listener: Parameters<typeof ImageHub.addCropperListener>[0]
+  ) => ImageHub.addCropperListener(listener),
 };
 
 // Automatic wrapper registration to enable Promise-based CameraScreen overlays

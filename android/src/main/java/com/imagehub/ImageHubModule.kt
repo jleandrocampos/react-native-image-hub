@@ -6,6 +6,8 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
 import android.util.Base64
 import android.util.Log
 import androidx.exifinterface.media.ExifInterface
@@ -39,18 +41,49 @@ class ImageHubModule(reactContext: ReactApplicationContext) :
   override fun getName(): String = NAME
 
   override fun openGallery(options: ReadableMap, promise: Promise) {
-    galleryPromise = promise
-    galleryMultiple = options.getBoolean("multiple")
-    galleryMaxFiles = options.getInt("maxFiles")
-
-    val intent = Intent(Intent.ACTION_PICK).apply {
-      type = "image/*"
-      putExtra(Intent.EXTRA_ALLOW_MULTIPLE, galleryMultiple)
+    val activity = currentActivity
+    if (activity == null) {
+      promise.reject("NO_ACTIVITY", "No current activity available")
+      return
     }
 
-    val chooserIntent = Intent.createChooser(intent, "Selecionar imagem")
-    currentActivity?.startActivityForResult(chooserIntent, PICK_IMAGE_REQUEST)
-      ?: promise.reject("NO_ACTIVITY", "No current activity available")
+    galleryPromise = promise
+    galleryMultiple = options.getBoolean("multiple")
+    galleryMaxFiles = options.getInt("maxFiles").coerceAtLeast(1)
+
+    try {
+      // System Photo Picker — no CAMERA / no broad storage. Do NOT use createChooser:
+      // HyperOS/MIUI injects Camera into the chooser and triggers CAMERA permission.
+      activity.startActivityForResult(createGalleryIntent(), PICK_IMAGE_REQUEST)
+    } catch (e: Exception) {
+      galleryPromise = null
+      Log.e(TAG, "Failed to open gallery", e)
+      promise.reject("GALLERY_ERROR", e.message ?: "Failed to open gallery")
+    }
+  }
+
+  /**
+   * Prefer MediaStore.ACTION_PICK_IMAGES (Android 13+ / HyperOS Photo Picker).
+   * Fallback: ACTION_GET_CONTENT without createChooser (keeps Camera out of the UI).
+   */
+  private fun createGalleryIntent(): Intent {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+      return Intent(MediaStore.ACTION_PICK_IMAGES).apply {
+        type = "image/*"
+        if (galleryMultiple) {
+          putExtra(
+            MediaStore.EXTRA_PICK_IMAGES_MAX,
+            galleryMaxFiles.coerceAtLeast(2)
+          )
+        }
+      }
+    }
+
+    return Intent(Intent.ACTION_GET_CONTENT).apply {
+      type = "image/*"
+      addCategory(Intent.CATEGORY_OPENABLE)
+      putExtra(Intent.EXTRA_ALLOW_MULTIPLE, galleryMultiple)
+    }
   }
 
   override fun onActivityResult(activity: Activity, requestCode: Int, resultCode: Int, data: Intent?) {
@@ -94,38 +127,22 @@ class ImageHubModule(reactContext: ReactApplicationContext) :
 
   private fun getImageInfoFromUri(uri: Uri): WritableMap? {
     return try {
-      val contentResolver = reactApplicationContext.contentResolver
-      val inputStream = contentResolver.openInputStream(uri) ?: return null
-      val bitmap = BitmapFactory.decodeStream(inputStream)
-      inputStream.close()
-
-      var width = bitmap.width
-      var height = bitmap.height
-
-      try {
-        val exifStream = contentResolver.openInputStream(uri)
-        if (exifStream != null) {
-          val exif = ExifInterface(exifStream)
-          val orientation = exif.getAttributeInt(
-            ExifInterface.TAG_ORIENTATION,
-            ExifInterface.ORIENTATION_NORMAL
-          )
-          if (orientation == ExifInterface.ORIENTATION_ROTATE_90 ||
-            orientation == ExifInterface.ORIENTATION_ROTATE_270
-          ) {
-            width = bitmap.height
-            height = bitmap.width
-          }
-          exifStream.close()
-        }
-      } catch (_: Exception) {}
+      // Materialize content:// into cache as file:// so cropper/Image work on MIUI/Xiaomi.
+      val localFile = copyUriToCache(uri)
+      val (width, height) = getExifDimensions(localFile.absolutePath)
+      if (width <= 0 || height <= 0) {
+        Log.e(TAG, "Invalid image bounds for uri=$uri")
+        return null
+      }
 
       val map = Arguments.createMap()
-      map.putString("uri", uri.toString())
+      map.putString("uri", "file://${localFile.absolutePath}")
       map.putInt("width", width)
       map.putInt("height", height)
-      map.putString("mime", contentResolver.getType(uri) ?: "image/jpeg")
-      bitmap.recycle()
+      map.putString(
+        "mime",
+        reactApplicationContext.contentResolver.getType(uri) ?: "image/jpeg"
+      )
       map
     } catch (e: Exception) {
       Log.e(TAG, "Error reading image info", e)
@@ -142,6 +159,10 @@ class ImageHubModule(reactContext: ReactApplicationContext) :
       }
 
       val (width, height) = getExifDimensions(file.absolutePath)
+      if (width <= 0 || height <= 0) {
+        promise.reject("IMAGE_INFO_ERROR", "Invalid image dimensions for: $uri")
+        return
+      }
 
       val map = Arguments.createMap()
       map.putInt("width", width)
@@ -149,6 +170,8 @@ class ImageHubModule(reactContext: ReactApplicationContext) :
       map.putString("mime", getMimeType(file.name))
       map.putDouble("size", file.length().toDouble())
       map.putString("modificationDate", null)
+      // Always expose a stable local path (important when input was content://).
+      map.putString("path", "file://${file.absolutePath}")
       promise.resolve(map)
     } catch (e: Exception) {
       promise.reject("IMAGE_INFO_ERROR", e.message)
@@ -401,18 +424,35 @@ class ImageHubModule(reactContext: ReactApplicationContext) :
   private fun resolveUri(uriString: String): File {
     val uri = Uri.parse(uriString)
     if (uri.scheme == "content") {
-      val cacheDir = reactApplicationContext.cacheDir
-      val inputStream = reactApplicationContext.contentResolver.openInputStream(uri)
-        ?: throw Exception("Cannot open content URI: $uriString")
-      val fileName = "imagehub_${System.currentTimeMillis()}_${uri.lastPathSegment ?: "temp"}"
-      val tempFile = File(cacheDir, fileName)
-      tempFile.outputStream().use { output ->
-        inputStream.copyTo(output)
-      }
-      inputStream.close()
-      return tempFile
+      return copyUriToCache(uri)
     }
     val path = uriString.replace("file://", "")
     return File(path)
+  }
+
+  /**
+   * Copy a content/file URI into app cache with a safe filename.
+   * Xiaomi/MIUI gallery URIs often include ":" or "/" in lastPathSegment,
+   * which breaks File creation and makes the cropper fail immediately.
+   */
+  private fun copyUriToCache(uri: Uri): File {
+    val cacheDir = reactApplicationContext.cacheDir
+    val inputStream: InputStream =
+      reactApplicationContext.contentResolver.openInputStream(uri)
+        ?: throw Exception("Cannot open URI: $uri")
+
+    val safeName = "imagehub_${System.currentTimeMillis()}_${(Math.random() * 10000).toInt()}.jpg"
+    val tempFile = File(cacheDir, safeName)
+    try {
+      tempFile.outputStream().use { output ->
+        inputStream.copyTo(output)
+      }
+    } finally {
+      try {
+        inputStream.close()
+      } catch (_: Exception) {
+      }
+    }
+    return tempFile
   }
 }

@@ -1,3 +1,4 @@
+import { useMemo, useEffect } from 'react';
 import {
   useSharedValue,
   useAnimatedStyle,
@@ -37,41 +38,58 @@ export function useCropGesture(cropArea: CropArea): UseCropGestureReturn {
   const translateXStart = useSharedValue(0);
   const translateYStart = useSharedValue(0);
 
-  const panGesture = Gesture.Pan()
-    .averageTouches(true)
-    .onStart(() => {
-      translateXStart.value = translateX.value;
-      translateYStart.value = translateY.value;
-    })
-    .onUpdate((e: any) => {
-      const maxTranslateX = Math.max(
-        ((scale.value - 1) * cropArea.width) / 2,
-        20
-      );
-      const maxTranslateY = Math.max(
-        ((scale.value - 1) * cropArea.height) / 2,
-        20
-      );
+  const cropWidthSV = useSharedValue(cropArea.width);
+  const cropHeightSV = useSharedValue(cropArea.height);
 
-      const newX = translateXStart.value + e.translationX;
-      const newY = translateYStart.value + e.translationY;
+  useEffect(() => {
+    cropWidthSV.value = cropArea.width;
+    cropHeightSV.value = cropArea.height;
+  }, [cropArea.width, cropArea.height, cropWidthSV, cropHeightSV]);
 
-      translateX.value = clamp(newX, -maxTranslateX, maxTranslateX);
-      translateY.value = clamp(newY, -maxTranslateY, maxTranslateY);
-    })
-    .minPointers(1)
-    .enabled(true);
+  const composed = useMemo(
+    () => {
+      const panGesture = Gesture.Pan()
+        .averageTouches(true)
+        .onStart(() => {
+          'worklet';
+          translateXStart.value = translateX.value;
+          translateYStart.value = translateY.value;
+        })
+        .onUpdate((e) => {
+          'worklet';
+          const maxTranslateX = Math.max(
+            ((scale.value - 1) * cropWidthSV.value) / 2,
+            20
+          );
+          const maxTranslateY = Math.max(
+            ((scale.value - 1) * cropHeightSV.value) / 2,
+            20
+          );
 
-  const pinchGesture = Gesture.Pinch()
-    .onStart(() => {
-      scaleStart.value = scale.value;
-    })
-    .onUpdate((e: any) => {
-      scale.value = clamp(scaleStart.value * e.scale, 1, 3);
-    })
-    .enabled(true);
+          const newX = translateXStart.value + e.translationX;
+          const newY = translateYStart.value + e.translationY;
 
-  const composed = Gesture.Simultaneous(panGesture, pinchGesture);
+          translateX.value = clamp(newX, -maxTranslateX, maxTranslateX);
+          translateY.value = clamp(newY, -maxTranslateY, maxTranslateY);
+        })
+        .minPointers(1);
+
+      const pinchGesture = Gesture.Pinch()
+        .onStart(() => {
+          'worklet';
+          scaleStart.value = scale.value;
+        })
+        .onUpdate((e) => {
+          'worklet';
+          scale.value = clamp(scaleStart.value * e.scale, 1, 3);
+        });
+
+      return Gesture.Simultaneous(panGesture, pinchGesture);
+    },
+    // Shared values are stable for the lifetime of the hook.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [

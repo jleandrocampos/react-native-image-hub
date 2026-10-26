@@ -80,11 +80,32 @@ export function calculateCropData(
 
 /**
  * Get image dimensions using native module.
+ * Prefers the materialized local `path` when native copied a content:// URI.
  */
 export async function getImageDimensions(uri: string): Promise<{
   width: number;
   height: number;
+  path?: string;
 }> {
   const info = await ImageHub.getImageInfo(uri);
-  return { width: info.width, height: info.height };
+  return {
+    width: info.width,
+    height: info.height,
+    path: info.path,
+  };
 }
+
+/**
+ * Ensure the URI is a stable local file:// path (copies content:// on Android).
+ */
+export async function ensureLocalImageUri(uri: string): Promise<string> {
+  if (uri.startsWith('file://') || uri.startsWith('/')) {
+    return uri.startsWith('file://') ? uri : `file://${uri}`;
+  }
+  const info = await ImageHub.getImageInfo(uri);
+  if (info?.path) {
+    return info.path;
+  }
+  return uri;
+}
+

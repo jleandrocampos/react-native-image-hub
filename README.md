@@ -206,6 +206,35 @@ const image = await ImagePicker.openCamera({
 
 ---
 
+## Cropper fallbacks & events
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| `allowSkipCrop` | `boolean` | Show **Usar original** in the cropper toolbar (default: `true`). |
+| `skipCropOnError` | `boolean` | If the cropper fails to open/load/process, still return the image (default: `true`). |
+| `cropperSkipText` | `string` | Label for the skip button (default: `'Usar original'`). |
+| `onCropperEvent` | `(event) => void` | Per-call lifecycle callback. |
+
+```javascript
+import { ImagePicker } from 'react-native-image-hub';
+
+const unsubscribe = ImagePicker.addCropperListener((event) => {
+  // open | ready | confirm | cancel | skip | error | dismiss
+  console.log('cropper', event);
+});
+
+await ImagePicker.openPicker({
+  cropping: true,
+  allowSkipCrop: true,
+  skipCropOnError: true,
+  onCropperEvent: (event) => console.log(event),
+});
+```
+
+Gallery selection on Android uses the **system Photo Picker** (`MediaStore.ACTION_PICK_IMAGES` on API 33+), not `ACTION_PICK` + `createChooser` — HyperOS/MIUI was injecting Camera into the chooser and prompting for camera permission when the user only tapped Gallery. Selected `content://` URIs are materialized into a local `file://` cache before the cropper (important on Xiaomi). The cropper Modal also waits briefly after the gallery Activity returns and ignores spurious back/dismiss events.
+
+---
+
 ## Contributing
 
 - [Development workflow](CONTRIBUTING.md#development-workflow)

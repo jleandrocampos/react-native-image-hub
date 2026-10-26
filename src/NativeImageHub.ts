@@ -13,6 +13,8 @@ export interface ImageInfo {
   mime: string;
   size: number;
   modificationDate?: string;
+  /** Local file:// path when the input was materialized from content:// */
+  path?: string;
 }
 
 export interface CompressOptions {
