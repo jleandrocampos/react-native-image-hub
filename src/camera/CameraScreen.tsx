@@ -18,6 +18,7 @@ import { useSharedValue, runOnJS } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CaptureButton } from './CaptureButton';
 import { CameraOverlay } from './CameraOverlay';
+import { useCameraSession } from './useCameraSession';
 import {
   CloseIcon,
   RotateIcon,
@@ -82,6 +83,7 @@ export function CameraScreen({
     qualityPrioritization: 'balanced',
     containerFormat: 'jpeg',
   });
+  const session = useCameraSession();
 
   const minZoom = device?.minZoom ?? 1;
   const maxZoom = device?.maxZoom ?? 10;
@@ -202,7 +204,7 @@ export function CameraScreen({
   };
 
   const handleCapture = async () => {
-    if (!photoOutput || isProcessingRef.current) return;
+    if (!photoOutput || !session.isReady || isProcessingRef.current) return;
     isProcessingRef.current = true;
     setIsCapturing(true);
 
@@ -309,10 +311,12 @@ export function CameraScreen({
           ref={cameraRef}
           style={StyleSheet.absoluteFill}
           device={device}
-          isActive={true}
+          isActive={session.isActive}
           outputs={[photoOutput]}
           resizeMode="cover"
           onPreviewStarted={handlePreviewStarted}
+          onStarted={session.onStarted}
+          onStopped={session.onStopped}
         />
 
         {/* Grid overlay */}
