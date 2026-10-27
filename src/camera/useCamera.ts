@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useCameraDevice, usePhotoOutput } from 'react-native-vision-camera';
 import { requestCameraPermission } from '../utils/permissions';
+import { useCameraSession } from './useCameraSession';
 import type { CameraOptions } from '../types';
 
 export type FlashMode = 'on' | 'off';
@@ -28,6 +29,7 @@ export interface UseCameraReturn {
   takePicture: () => Promise<string>;
   /** Whether a photo is being processed */
   isCapturing: boolean;
+  session: ReturnType<typeof useCameraSession>;
 }
 
 const FLASH_CYCLE: FlashMode[] = ['off', 'on'];
@@ -53,6 +55,7 @@ export function useCamera(options: CameraOptions = {}): UseCameraReturn {
     qualityPrioritization: 'balanced',
     containerFormat: 'jpeg',
   });
+  const session = useCameraSession();
 
   useEffect(() => {
     requestCameraPermission().then((granted) => {
@@ -82,7 +85,7 @@ export function useCamera(options: CameraOptions = {}): UseCameraReturn {
   );
 
   const takePicture = useCallback(async (): Promise<string> => {
-    if (!photoOutput) {
+    if (!photoOutput || !session.isReady) {
       throw new Error('Camera not ready');
     }
 
@@ -110,7 +113,7 @@ export function useCamera(options: CameraOptions = {}): UseCameraReturn {
       isProcessingRef.current = false;
       setIsCapturing(false);
     }
-  }, [photoOutput, flashMode, options.enableShutterSound]);
+  }, [photoOutput, session.isReady, flashMode, options.enableShutterSound]);
 
   return {
     hasPermission,
@@ -124,5 +127,6 @@ export function useCamera(options: CameraOptions = {}): UseCameraReturn {
     setZoom,
     takePicture,
     isCapturing,
+    session,
   };
 }

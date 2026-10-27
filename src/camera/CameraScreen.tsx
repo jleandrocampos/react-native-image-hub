@@ -317,6 +317,8 @@ export function CameraScreen({
           onPreviewStarted={handlePreviewStarted}
           onStarted={session.onStarted}
           onStopped={session.onStopped}
+          onInterruptionStarted={session.onInterruptionStarted}
+          onInterruptionEnded={session.onInterruptionEnded}
         />
 
         {/* Grid overlay */}

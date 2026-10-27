@@ -561,6 +561,8 @@ export function CameraOverlay({
           onPreviewStarted={handlePreviewStarted}
           onStarted={session.onStarted}
           onStopped={session.onStopped}
+          onInterruptionStarted={session.onInterruptionStarted}
+          onInterruptionEnded={session.onInterruptionEnded}
         />
 
         {/* Grid overlay */}

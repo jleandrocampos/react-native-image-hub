@@ -6,6 +6,7 @@ export function useCameraSession() {
     AppState.currentState !== 'background'
   );
   const [isRunning, setIsRunning] = useState(false);
+  const [isInterrupted, setIsInterrupted] = useState(false);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
@@ -14,13 +15,20 @@ export function useCameraSession() {
     return () => subscription.remove();
   }, []);
 
-  const onStarted = useCallback(() => setIsRunning(true), []);
+  const onStarted = useCallback(() => {
+    setIsRunning(true);
+    setIsInterrupted(false);
+  }, []);
   const onStopped = useCallback(() => setIsRunning(false), []);
+  const onInterruptionStarted = useCallback(() => setIsInterrupted(true), []);
+  const onInterruptionEnded = useCallback(() => setIsInterrupted(false), []);
 
   return {
     isActive: isForeground,
-    isReady: isForeground && isRunning,
+    isReady: isForeground && isRunning && !isInterrupted,
     onStarted,
     onStopped,
+    onInterruptionStarted,
+    onInterruptionEnded,
   };
 }
