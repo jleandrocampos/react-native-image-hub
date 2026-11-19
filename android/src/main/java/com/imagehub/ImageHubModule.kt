@@ -41,7 +41,7 @@ class ImageHubModule(reactContext: ReactApplicationContext) :
   override fun getName(): String = NAME
 
   override fun openGallery(options: ReadableMap, promise: Promise) {
-    val activity = currentActivity
+    val activity = reactApplicationContext.currentActivity
     if (activity == null) {
       promise.reject("NO_ACTIVITY", "No current activity available")
       return

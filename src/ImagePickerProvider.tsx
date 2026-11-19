@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Modal, StyleSheet, InteractionManager } from 'react-native';
+import { Modal, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { CameraScreen } from './camera/CameraScreen';
@@ -8,6 +8,9 @@ import { cameraManager } from './CameraManager';
 import { cropperManager } from './CropperManager';
 import type { CameraRequest } from './CameraManager';
 import type { CropperRequest } from './CropperManager';
+
+// RN exposes requestIdleCallback as a global but does not ship its type.
+declare const requestIdleCallback: (callback: () => void) => number;
 
 export interface ImagePickerProviderProps {
   children: React.ReactNode;
@@ -83,7 +86,7 @@ export function ImagePickerProvider({ children }: ImagePickerProviderProps) {
         setCropRequest(req);
         setCropVisible(false);
         // Defer Modal visibility until interactions/activity resume settle.
-        InteractionManager.runAfterInteractions(() => {
+        requestIdleCallback(() => {
           cropShowTimerRef.current = setTimeout(() => {
             cropBackGraceUntilRef.current = Date.now() + CROPPER_BACK_GRACE_MS;
             setCropVisible(true);
